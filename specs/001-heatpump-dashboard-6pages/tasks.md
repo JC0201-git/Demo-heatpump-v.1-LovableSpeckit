@@ -27,6 +27,10 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T004 [P] 初始化前端 React + TypeScript 專案，安裝 @tanstack/react-query、react-router-dom、recharts、dayjs；安裝 devDependencies：vitest、@playwright/test（`frontend/package.json`）
 - [ ] T005 [P] 建立後端環境變數範本，涵蓋 PORT、DB_HOST/PORT/NAME/USER/PASS、INFLUXDB_HOST/PORT/DATABASE、NODERED_BASE_URL、ALERT_CHECK_INTERVAL_MINUTES、DEVICE_OFFLINE_THRESHOLD_MINUTES（`backend/.env.example`）
 - [ ] T006 [P] 設定後端 ESLint + Prettier（`backend/.eslintrc.json`、`backend/.prettierrc`）；設定前端 ESLint + Prettier（`frontend/.eslintrc.json`、`frontend/.prettierrc`）
+- [ ] T006b [P] 建立 GitHub Actions CI Pipeline（`.github/workflows/ci.yml`、`.lighthouserc.json`）：
+  - **Lint Job**：`cd backend && npm run lint`、`cd frontend && npm run lint`，任一失敗即阻塞 merge
+  - **Test Job**（依賴 Lint Job）：`cd backend && jest --coverage`（需 ≥ 80% line coverage）、`cd frontend && vitest run --coverage`（需 ≥ 80%）
+  - **Lighthouse CI Job**（依賴 Test Job，PR 與 main 分支觸發）：使用 `treosh/lighthouse-ci-action`，設定 `lcp ≤ 2500`、`performance ≥ 90`、`accessibility ≥ 85` 為強制閘門
 
 ---
 
@@ -106,6 +110,12 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T041 [P] [US1] 建立 `useDevices` React Query Hook，支援 `siteId`/`status` 篩選參數、60 秒自動刷新（`frontend/src/services/useDevices.ts`）
 - [ ] T042 [US1] 建立設備總覽頁面，含場域分組設備狀態卡（異常設備醒目紅框標示、顯示最後更新時間）、降級狀態橫幅（`frontend/src/pages/DeviceOverview/index.tsx`）
 
+### 測試實作
+
+- [ ] T042a [P] [US1] 建立後端單元測試：驗證 `deviceService.js` 在 `degraded=true` 時回傳最後已知資料與正確 `data_quality` 旗標（`backend/tests/unit/deviceService.test.js`）
+- [ ] T042b [P] [US1] 建立前端單元測試：驗證 `useDevices` hook 在 API 回傳 `degraded:true` 時，`isDegraded` 旗標正確傳遞至 UI 狀態（`frontend/tests/unit/useDevices.test.ts`）
+- [ ] T042c [US1] 建立 Playwright E2E 測試（US1 主路徑）：登入 → 進入設備總覽 → 驗證顯示 3 個場域、至少 7 台設備狀態卡；模擬 health API 回傳 `down` → 驗證降級橫幅顯示（`frontend/tests/e2e/device-overview.spec.ts`）
+
 **Checkpoint**：US1 獨立可測試 — 設備狀態卡正確顯示、降級提示橫幅有效觸發、角色切換 UI 可用
 
 ---
@@ -124,6 +134,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T044 [US2] 建立 `useRisks` React Query Hook，含風險指派 `useMutation`（POST）與風險清單查詢（`frontend/src/services/useRisks.ts`）
 - [ ] T045 [US2] 建立風險排序頁面，含高/中/低分組設備清單（顯示指派人員/時間/備註）、operator 可用的風險指派 Modal 表單（`frontend/src/pages/RiskRanking/index.tsx`）
+
+### 測試實作
+
+- [ ] T045a [P] [US2] 建立後端單元測試：驗證 `POST /api/v1/risks` 在 `operator` 角色時正確建立指派並將舊紀錄 `is_current` 設為 0；`manager` 角色時回傳 HTTP 403（`backend/tests/unit/risks.test.js`）
+- [ ] T045b [US2] 建立 Playwright E2E 測試（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
 
 **Checkpoint**：US2 獨立可測試 — 風險清單按等級排序，operator 指派後即時反映，manager 無寫入操作
 
@@ -146,6 +161,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T049 [P] [US3] 建立 `useDeviceAlerts` React Query Hook，以 `heat_pump_id` 篩選告警歷史，重用 `GET /api/v1/alerts`（`frontend/src/services/useDeviceAlerts.ts`）
 - [ ] T050 [US3] 建立單機履歷頁面，含時間範圍選擇器、Recharts LineChart 參數趨勢圖（斷線處理）、保養紀錄清單、告警歷史清單（無資料顯示明確提示文字）（`frontend/src/pages/DeviceHistory/index.tsx`）
 
+### 測試實作
+
+- [ ] T050a [P] [US3] 建立後端單元測試：驗證 `GET /api/v1/devices/:device_id/history` 依時間範圍正確切換解析度（≤1d → 5m、≤7d → 1h、>7d → 1d）（`backend/tests/unit/deviceHistory.test.js`）
+- [ ] T050b [US3] 建立 Playwright E2E 測試（US3 主路徑）：選定任一設備 → 切換至 30 天範圍 → 驗證趨勢圖顯示資料點；選擇無告警期間 → 驗證顯示「此期間無告警紀錄」文字（`frontend/tests/e2e/device-history.spec.ts`）
+
 **Checkpoint**：US3 獨立可測試 — 趨勢圖正確顯示指定期間資料，無告警/無保養記錄時顯示明確提示
 
 ---
@@ -164,6 +184,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T052 [US4] 建立 `useAlerts` React Query Hook，含 acknowledge/resolve `useMutation` 與告警清單查詢（`frontend/src/services/useAlerts.ts`）
 - [ ] T053 [US4] 建立告警中心頁面，含未處理/已確認/已解決分頁清單、場域/設備/類型篩選器、確認與解決操作 Modal（manager 角色自動隱藏寫入按鈕）（`frontend/src/pages/AlertCenter/index.tsx`）
+
+### 測試實作
+
+- [ ] T053a [P] [US4] 建立後端整合測試：驗證 `PATCH /api/v1/alerts/:id/acknowledge` 在 `operator` 角色時正確更新 `acknowledged_at` 與 `acknowledged_by`；`manager` 角色時回傳 HTTP 403（`backend/tests/integration/alerts.test.js`）
+- [ ] T053b [US4] 建立 Playwright E2E 測試（US4 主路徑）：以 operator 進入告警中心 → 確認一筆未處理告警 → 驗證移至已確認清單；輸入解決備註 → 驗證備註儲存；切換 manager 角色 → 驗證無操作按鈕（`frontend/tests/e2e/alert-center.spec.ts`）
 
 **Checkpoint**：US4 獨立可測試 — 告警清單正確分頁，operator 可確認/解決，manager 無寫入操作
 
@@ -186,6 +211,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T057 [US5] 建立 `useMonthlyReport` React Query Hook，含月報產生 `useMutation`（`frontend/src/services/useMonthlyReport.ts`）
 - [ ] T058 [US5] 建立月報頁面，含場域/月份選擇器、月報 HTML 渲染預覽（`dangerouslySetInnerHTML` 或 `<iframe>`）、`window.print()` 列印按鈕（`frontend/src/pages/MonthlyReport/index.tsx`）
 
+### 測試實作
+
+- [ ] T058a [P] [US5] 建立後端單元測試：依 spec.md FR-005 補充定義驗證 `reportService.js` 可用率計算公式；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
+- [ ] T058b [US5] 建立 Playwright E2E 測試（US5 主路徑）：選擇「拉拉手游泳學院」+ 當前月份 → 觸發產生 → 驗證月報 HTML 預覽顯示含可用率與告警統計；驗證 `window.print()` 列印按鈕可呼叫（`frontend/tests/e2e/monthly-report.spec.ts`）
+
 **Checkpoint**：US5 獨立可測試 — 月報預覽正確顯示，列印 PDF 版面正常，無告警月份顯示「本月無異常事件」
 
 ---
@@ -205,6 +235,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T061 [US6] 建立 `useDashboardSummary` React Query Hook，60 秒自動刷新（`frontend/src/services/useDashboardSummary.ts`）
 - [ ] T062 [US6] 建立老闆決策頁，含整體健康度統計卡、各場域告警環比 Recharts BarChart（異常場域視覺化突顯）、點選場域名稱導航至設備總覽頁面（`frontend/src/pages/ExecutiveDashboard/index.tsx`）
+
+### 測試實作
+
+- [ ] T062a [P] [US6] 建立後端單元測試：驗證 `dashboardService.js` 跨場域統計聚合正確（normal/warning/fault/offline 計數總和 = 80）；驗證環比計算在上月 0 告警時不產生除零錯誤（`backend/tests/unit/dashboardService.test.js`）
+- [ ] T062b [US6] 建立 Playwright E2E 測試（US6 主路徑）：以 manager 角色進入老闆決策頁 → 驗證 3 個場域統計卡顯示 → 點選場域名稱 → 驗證跳轉至設備總覽並套用場域篩選（`frontend/tests/e2e/executive-dashboard.spec.ts`）
 
 **Checkpoint**：US6 獨立可測試 — 跨場域統計卡正確、環比趨勢柱狀圖顯示，點選場域可導航
 
