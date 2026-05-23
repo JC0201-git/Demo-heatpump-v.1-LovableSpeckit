@@ -18,11 +18,13 @@ v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色
 
 ## 技術背景
 
-**語言/版本**：Node.js 18 LTS（後端）、React 18 + TypeScript（前端）
+**語言/版本**：Node.js 18 LTS（後端執行環境）、React + TypeScript（前端；npm 套件以精確版本鎖定）
 
 **主要依賴**：
-- 後端：Express 4.x、Sequelize 6.x、mysql2、node-influx、node-cron、ejs、@faker-js/faker
-- 前端：TanStack Query v5、React Router v6、Recharts、dayjs
+- 後端：Express、Sequelize、mysql2、node-influx、node-cron、ejs、@faker-js/faker
+- 前端：TanStack Query、React Router、Recharts、dayjs
+
+**依賴鎖定政策**：所有 npm 執行期依賴與 `devDependencies` 必須使用精確版本安裝並提交鎖定檔；`package.json` 不得出現 `^`、`~`、`x`、`*` 等浮動版本範圍；CI 必須使用 `npm ci` 並檢查依賴版本鎖定。
 
 **儲存**：MySQL 8.0（業務資料）、InfluxDB 1.8（時序資料）
 
@@ -33,10 +35,13 @@ v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色
 **專案類型**：內部維運 Web 應用程式（前後端分離）
 
 **效能目標**：
+- 首次頁面載入 LCP ≤ 2.5 秒（模擬 4G 條件）
+- 可互動時間 TTI ≤ 3.5 秒（模擬 4G 條件）
 - 設備總覽頁面完整顯示 ≤ 3 秒
 - API 回應 P95 ≤ 500ms
 - 月報產生 ≤ 30 秒
 - 資料源中斷降級提示 ≤ 10 秒
+- 每個 PR 的前端 gzip bundle 增量不得超過 10 kB，除非 PR 明確記錄並核准效能預算例外
 
 **限制條件**：前端不得直接呼叫 InfluxDB 或 MySQL；資料庫不得公開暴露
 
@@ -46,17 +51,17 @@ v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色
 
 ## 憲法符合性檢查
 
-*閘門：Phase 0 研究前必須通過。Phase 1 設計後重新確認。*
+*閘門：第 0 階段研究前必須通過。第 1 階段設計後重新確認。*
 
 | 原則 | 狀態 | 備註 |
 |------|------|------|
-| I. 程式碼品質 | ✅ 符合 | 採用 ESLint + Prettier；模組化分層；檔案限制 300 行 |
+| I. 程式碼品質 | ✅ 符合 | 採用 ESLint + Prettier；模組化分層；檔案限制 300 行；依賴以精確版本與鎖定檔固定 |
 | II. 測試優先 | ✅ 符合 | 規格驗收情境轉為測試案例；需達 ≥ 80% 覆蓋率 |
 | III. UX 一致性 | ✅ 符合 | 前端建立共用 theme token；6 頁面使用共用元件庫 |
-| IV. 效能要求 | ✅ 符合 | LCP ≤ 2.5s；API P95 ≤ 500ms；降級顯示已設計 |
-| V. 文件語言標準 | ✅ 符合 | 所有文件以繁體中文撰寫；程式碼識別符使用英文 |
+| IV. 效能要求 | ✅ 符合 | LCP ≤ 2.5s；TTI ≤ 3.5s；API P95 ≤ 500ms；bundle gzip 增量 ≤ 10 kB；降級顯示已設計 |
+| V. 文件語言標準 | ✅ 符合 | 章節標題與任務說明使用繁體中文；英文僅保留於程式碼識別符、命令、路徑、API/library 名稱與標準縮寫 |
 
-**Phase 1 重新確認**：通過 — 資料模型、API 契約皆以繁體中文文件化，無原則違反。
+**第 1 階段重新確認**：通過 — 資料模型、API 契約皆以繁體中文文件化，無原則違反。
 
 ---
 
@@ -67,12 +72,12 @@ v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色
 ```text
 specs/001-heatpump-dashboard-6pages/
 ├── plan.md              # 本檔案（/speckit.plan 輸出）
-├── research.md          # Phase 0 輸出
-├── data-model.md        # Phase 1 輸出
-├── quickstart.md        # Phase 1 輸出
+├── research.md          # 第 0 階段輸出
+├── data-model.md        # 第 1 階段輸出
+├── quickstart.md        # 第 1 階段輸出
 ├── contracts/
-│   └── rest-api.md      # Phase 1 輸出
-└── tasks.md             # Phase 2 輸出（/speckit.tasks 指令產生）
+│   └── rest-api.md      # 第 1 階段輸出
+└── tasks.md             # 第 2 階段輸出（/speckit.tasks 指令產生）
 ```
 
 ### 原始碼（專案根目錄）
@@ -188,7 +193,7 @@ specs/
 
 | 功能 | 說明 |
 |------|------|
-| 頁面路由 | React Router v6；根據角色控制路由存取 |
+| 頁面路由 | React Router；根據角色控制路由存取 |
 | 資料請求 | React Query；60 秒自動刷新；錯誤降級顯示 |
 | 角色管理 | `RoleContext`；localStorage 持久化；`X-Role` Header 注入 |
 | 缺欄位顯示 | `value ?? '--'`；趨勢圖斷線處理 |
@@ -248,7 +253,7 @@ Mock 資料生成                    不直接回應前端
 | 保養紀錄 | MySQL | 業務資料 |
 | 月報紀錄（含 HTML） | MySQL | 業務資料，不需時序特性 |
 | 設備目前狀態（`current_status`） | MySQL（`heat_pumps` 欄位） | 由後端排程更新，前端快速讀取 |
-| 設備狀態快照（每 5 分鐘） | MySQL `status_snapshots` 或 InfluxDB | 月報可用率歷史依據 |
+| 設備狀態快照（每 5 分鐘） | MySQL `status_snapshots` | 月報可用率歷史計算的唯一依據 |
 
 ---
 
@@ -431,7 +436,7 @@ POST /api/v1/reports/monthly
     ↓
 後端聚合資料：
   MySQL: alerts（告警統計）
-  status_snapshots 或 InfluxDB 狀態序列（依 5 分鐘區間計算可用率）
+  MySQL: status_snapshots（依 5 分鐘區間計算可用率的唯一來源）
   InfluxDB: power_meter（月用電量）
     ↓
 ejs 模板渲染 HTML 字串

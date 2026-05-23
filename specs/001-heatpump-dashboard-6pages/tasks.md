@@ -13,28 +13,30 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ## 格式說明：`[TaskID] [P?] [Story?] 任務描述，含確切檔案路徑`
 
 - **[P]**：可平行執行（不同檔案、無未完成任務依賴）
-- **[Story]**：所屬使用者故事（US1–US6），Setup/Foundational 階段不加此標籤
+- **[Story]**：所屬使用者故事（US1–US6），專案初始化／基礎建設階段不加此標籤
 
 ---
 
-## 第一階段：專案初始化（Setup）
+## 第一階段：專案初始化
 
 **目的**：建立基本目錄結構與開發工具設定
 
 - [ ] T001 依實作計畫建立後端目錄結構（`backend/src/{api,models,services,middleware,jobs,templates}/`、`backend/db/{migrations,seeders}/`、`backend/tests/`）
 - [ ] T002 [P] 依實作計畫建立前端目錄結構（`frontend/src/{components,pages/{DeviceOverview,RiskRanking,DeviceHistory,AlertCenter,MonthlyReport,ExecutiveDashboard},services,contexts,theme,utils}/`、`frontend/tests/`）
-- [ ] T003 初始化後端 Node.js 專案，安裝 express、sequelize、mysql2、node-influx、node-cron、ejs、@faker-js/faker、axios、dotenv、cors；安裝 devDependencies：sequelize-cli、jest、nodemon（`backend/package.json`）
-- [ ] T004 [P] 初始化前端 React + TypeScript 專案，安裝 @tanstack/react-query、react-router-dom、recharts、dayjs；安裝 devDependencies：vitest、@playwright/test（`frontend/package.json`）
+- [ ] T003 初始化後端 Node.js 專案，設定 npm `save-exact=true`，以 `--save-exact` 安裝 express、sequelize、mysql2、node-influx、node-cron、ejs、@faker-js/faker、axios、dotenv、cors；以 `--save-exact --save-dev` 安裝 sequelize-cli、jest、nodemon；提交 `backend/package.json` 與 `backend/package-lock.json`，且不得含浮動版本範圍（`backend/package.json`、`backend/package-lock.json`）
+- [ ] T004 [P] 初始化前端 React + TypeScript 專案，設定 npm `save-exact=true`，以 `--save-exact` 安裝 @tanstack/react-query、react-router-dom、recharts、dayjs；以 `--save-exact --save-dev` 安裝 vitest、@playwright/test；提交 `frontend/package.json` 與 `frontend/package-lock.json`，且不得含浮動版本範圍（`frontend/package.json`、`frontend/package-lock.json`）
 - [ ] T005 [P] 建立後端環境變數範本，涵蓋 PORT、DB_HOST/PORT/NAME/USER/PASS、INFLUXDB_HOST/PORT/DATABASE、NODERED_BASE_URL、ALERT_CHECK_INTERVAL_MINUTES、DEVICE_OFFLINE_THRESHOLD_MINUTES（`backend/.env.example`）
 - [ ] T006 [P] 設定後端 ESLint + Prettier（`backend/.eslintrc.json`、`backend/.prettierrc`）；設定前端 ESLint + Prettier（`frontend/.eslintrc.json`、`frontend/.prettierrc`）
-- [ ] T006b [P] 建立 GitHub Actions CI Pipeline（`.github/workflows/ci.yml`、`.lighthouserc.json`）：
-  - **Lint 工作**：`cd backend && npm run lint`、`cd frontend && npm run lint`，任一失敗即阻塞 merge
-  - **測試工作**（依賴 Lint 工作）：`cd backend && jest --coverage`（需 ≥ 80% line coverage）、`cd frontend && vitest run --coverage`（需 ≥ 80%）
-  - **Lighthouse CI 工作**（依賴測試工作，PR 與 main 分支觸發）：使用 `treosh/lighthouse-ci-action`，設定 `lcp ≤ 2500`、`performance ≥ 90`、`accessibility ≥ 85` 為強制閘門
+- [ ] T006b [P] 建立 GitHub Actions CI 流程（`.github/workflows/ci.yml`、`.lighthouserc.json`、`scripts/check-exact-deps.mjs`、`frontend/scripts/check-bundle-budget.mjs`、`frontend/bundle-budget.json`）：
+  - **程式碼檢查工作**：`cd backend && npm run lint`、`cd frontend && npm run lint`，任一失敗即阻塞合併
+  - **測試工作**（依賴程式碼檢查工作）：`cd backend && npm ci && jest --coverage`（需 ≥ 80% line coverage）、`cd frontend && npm ci && vitest run --coverage`（需 ≥ 80%）
+  - **依賴鎖定檢查工作**：執行 `node scripts/check-exact-deps.mjs backend/package.json frontend/package.json`，禁止正式與開發依賴使用浮動版本範圍；CI 一律使用 `npm ci`
+  - **Lighthouse CI 工作**（依賴測試工作，PR 與 main 分支觸發）：使用 `treosh/lighthouse-ci-action`，設定 `lcp ≤ 2500`、`tti ≤ 3500`、`performance ≥ 90`、`accessibility ≥ 85` 為強制閘門
+  - **bundle 預算工作**：前端 build 後執行 `node frontend/scripts/check-bundle-budget.mjs`，計算 gzip 後 JS/CSS 資產大小；任一 PR 相較 `frontend/bundle-budget.json` 增量超過 10 kB 時阻塞合併，除非 PR 明確記錄並核准效能預算例外
 
 ---
 
-## 第二階段：基礎建設（Foundational — 阻塞所有使用者故事）
+## 第二階段：基礎建設（阻塞所有使用者故事）
 
 **目的**：所有使用者故事共用的核心基礎設施，必須全部完成後使用者故事才能開始實作
 
@@ -73,13 +75,13 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 告警引擎
 
-#### TDD: 告警規則 Failing Tests（先建立，確認失敗後進入 T027/T028 實作）
+#### TDD：告警規則預期失敗測試（先建立，確認失敗後進入 T027/T028 實作）
 
-- [ ] T026a [P] 建立 alertEngine failing test：驗證設備超過 5 分鐘無資料時產生離線告警（`backend/tests/unit/alertEngine.test.js`）
-- [ ] T026b [P] 建立 alertEngine failing test：驗證 `error_code != 0` 時產生錯誤碼告警（`backend/tests/unit/alertEngine.test.js`）
-- [ ] T026c [P] 建立 alertEngine failing test：驗證 warning/critical 門溻觸發對應設備狀態（`backend/tests/unit/alertEngine.test.js`）
-- [ ] T026d [P] 建立 statusUpdater failing test：驗證排程重跑不產生重複告警（唯一性保護）（`backend/tests/unit/statusUpdater.test.js`）
-- [ ] T026e [P] 建立 statusUpdater failing test：驗證排程上次失敗後，下次執行可補偵測遗漏的告警（`backend/tests/unit/statusUpdater.test.js`）
+- [ ] T026a [P] 建立 alertEngine 預期失敗測試：驗證設備超過 5 分鐘無資料時產生離線告警（`backend/tests/unit/alertEngine.test.js`）
+- [ ] T026b [P] 建立 alertEngine 預期失敗測試：驗證 `error_code != 0` 時產生錯誤碼告警（`backend/tests/unit/alertEngine.test.js`）
+- [ ] T026c [P] 建立 alertEngine 預期失敗測試：驗證 warning/critical 門溻觸發對應設備狀態（`backend/tests/unit/alertEngine.test.js`）
+- [ ] T026d [P] 建立 statusUpdater 預期失敗測試：驗證排程重跑不產生重複告警（唯一性保護）（`backend/tests/unit/statusUpdater.test.js`）
+- [ ] T026e [P] 建立 statusUpdater 預期失敗測試：驗證排程上次失敗後，下次執行可補偵測遗漏的告警（`backend/tests/unit/statusUpdater.test.js`）
 
 - [ ] T027 建立告警引擎，實作三種規則：離線偵測（`status_updated_at` 超過 5 分鐘）、錯誤碼偵測（`error_code != 0`）、溫度/壓力門檻超限；新告警寫入 `alerts` 表（`backend/src/services/alertEngine.js`）
 - [ ] T028 建立 node-cron 排程任務，每 5 分鐘執行：呼叫告警引擎 → 更新 `heat_pumps.current_status` → 同步寫入 `status_snapshots`（含 `heat_pump_id`、`snapshot_at`、`status`、`source='statusUpdater'`）→ 觸發離線告警（`backend/src/jobs/statusUpdater.js`）
@@ -90,7 +92,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 前端基礎框架
 
-- [ ] T030 建立前端應用程式進入點，設定 React Router v6 六頁面路由骨架，掛載 React Query Provider 與 RoleContext Provider（`frontend/src/main.tsx`、`frontend/src/App.tsx`）
+- [ ] T030 建立前端應用程式進入點，設定 React Router 六頁面路由骨架，掛載 React Query Provider 與 RoleContext Provider（`frontend/src/main.tsx`、`frontend/src/App.tsx`）
 - [ ] T031 [P] 建立 `RoleContext`，含 localStorage 持久化、角色切換下拉選單 UI（operator/manager）、`X-Role` Header 自動注入邏輯（`frontend/src/contexts/RoleContext.tsx`）
 - [ ] T032 [P] 建立設計 Token，定義設備狀態顏色（normal=green、warning=yellow、fault=red、offline=gray）、字型、間距常數（`frontend/src/theme/tokens.ts`）
 - [ ] T033 [P] 建立共用 UI 元件：`StatusDot`（圓形設備狀態指示點）、`Badge`（角色/等級標籤）（`frontend/src/components/StatusDot.tsx`、`frontend/src/components/Badge.tsx`）
@@ -108,11 +110,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **獨立測試**：操作人員能在頁面上看到「拉拉手游泳學院（3 台）、洗衣廠（2 台）、罐頭工廠（2 台）」7 台設備的即時狀態卡（含異常醒目標示），以及資料源中斷時的降級提示橫幅，即視為完整可交付
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T037a [P] [US1] 建立後端單元 failing test：驗證 `deviceService.js` 在 `degraded=true` 時回傳最後已知資料與正確 `data_quality` 旗標（`backend/tests/unit/deviceService.test.js`）
-- [ ] T037b [P] [US1] 建立前端單元 failing test：驗證 `useDevices` hook 在 API 回傳 `degraded:true` 時，`isDegraded` 旗標正確傳遞至 UI 狀態（`frontend/tests/unit/useDevices.test.ts`）
-- [ ] T037c [US1] 建立 Playwright E2E failing test（US1 主路徑）：登入 → 進入設備總覽 → 驗證顯示 3 個場域、80 台設備狀態卡（並驗證至少 7 台代表設備資料正確）；模擬 health API 回傳 `down` → 驗證降級橫幅顯示（`frontend/tests/e2e/device-overview.spec.ts`）
+- [ ] T037a [P] [US1] 建立後端單元預期失敗測試：驗證 `deviceService.js` 在 `degraded=true` 時回傳最後已知資料與正確 `data_quality` 旗標（`backend/tests/unit/deviceService.test.js`）
+- [ ] T037b [P] [US1] 建立前端單元預期失敗測試：驗證 `useDevices` hook 在 API 回傳 `degraded:true` 時，`isDegraded` 旗標正確傳遞至 UI 狀態（`frontend/tests/unit/useDevices.test.ts`）
+- [ ] T037c [US1] 建立 Playwright E2E 預期失敗測試（US1 主路徑）：登入 → 進入設備總覽 → 驗證顯示 3 個場域、80 台設備狀態卡（並驗證至少 7 台代表設備資料正確）；模擬 health API 回傳 `down` → 驗證降級橫幅顯示（`frontend/tests/e2e/device-overview.spec.ts`）
 
 ### 後端實作
 
@@ -136,10 +138,10 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **獨立測試**：操作人員能看到依風險等級（高/中/低）排序的設備清單，operator 可指派/更新風險等級，manager 僅可唯讀，即視為完整可交付
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T043a [P] [US2] 建立後端單元 failing test：驗證 `POST /api/v1/risks` 在 `operator` 角色時正確建立指派並將舊紀錄 `is_current` 設為 0；`manager` 角色時回傳 HTTP 403（`backend/tests/unit/risks.test.js`）
-- [ ] T043b [US2] 建立 Playwright E2E failing test（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
+- [ ] T043a [P] [US2] 建立後端單元預期失敗測試：驗證 `POST /api/v1/risks` 在 `operator` 角色時正確建立指派並將舊紀錄 `is_current` 設為 0；`manager` 角色時回傳 HTTP 403（`backend/tests/unit/risks.test.js`）
+- [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
 
 ### 後端實作
 
@@ -162,10 +164,10 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 後端實作
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T046a [P] [US3] 建立後端單元 failing test：驗證 `GET /api/v1/devices/:device_id/history` 依時間範圍正確切換解析度（≤1d → 5m、≤7d → 1h、>7d → 1d）（`backend/tests/unit/deviceHistory.test.js`）
-- [ ] T046b [US3] 建立 Playwright E2E failing test（US3 主路徑）：選定任一設備 → 切換至 30 天範圍 → 驗證趨勢圖顯示資料點；選擇無告警期間 → 驗證顯示「此期間無告警紀錄」文字（`frontend/tests/e2e/device-history.spec.ts`）
+- [ ] T046a [P] [US3] 建立後端單元預期失敗測試：驗證 `GET /api/v1/devices/:device_id/history` 依時間範圍正確切換解析度（≤1d → 5m、≤7d → 1h、>7d → 1d）（`backend/tests/unit/deviceHistory.test.js`）
+- [ ] T046b [US3] 建立 Playwright E2E 預期失敗測試（US3 主路徑）：選定任一設備 → 切換至 30 天範圍 → 驗證趨勢圖顯示資料點；選擇無告警期間 → 驗證顯示「此期間無告警紀錄」文字（`frontend/tests/e2e/device-history.spec.ts`）
 
 ### 後端實作
 
@@ -188,10 +190,10 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **獨立測試**：維運人員能看到未處理告警清單、執行確認/解決操作並填寫備註，manager 僅可查看歷史，即視為完整可交付
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T051a [P] [US4] 建立後端整合 failing test：驗證 `PATCH /api/v1/alerts/:id/acknowledge` 在 `operator` 角色時正確更新 `acknowledged_at` 與 `acknowledged_by`；`manager` 角色時回傳 HTTP 403（`backend/tests/integration/alerts.test.js`）
-- [ ] T051b [US4] 建立 Playwright E2E failing test（US4 主路徑）：以 operator 進入告警中心 → 確認一筆未處理告警 → 驗證移至已確認清單；輸入解決備註 → 驗證備註儲存；切換 manager 角色 → 驗證無操作按鈕（`frontend/tests/e2e/alert-center.spec.ts`）
+- [ ] T051a [P] [US4] 建立後端整合預期失敗測試：驗證 `PATCH /api/v1/alerts/:id/acknowledge` 在 `operator` 角色時正確更新 `acknowledged_at` 與 `acknowledged_by`；`manager` 角色時回傳 HTTP 403（`backend/tests/integration/alerts.test.js`）
+- [ ] T051b [US4] 建立 Playwright E2E 預期失敗測試（US4 主路徑）：以 operator 進入告警中心 → 確認一筆未處理告警 → 驗證移至已確認清單；輸入解決備註 → 驗證備註儲存；切換 manager 角色 → 驗證無操作按鈕（`frontend/tests/e2e/alert-center.spec.ts`）
 
 ### 後端實作
 
@@ -212,10 +214,10 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **獨立測試**：管理人員選擇場域與月份後，系統產生含可用率、告警統計的月報 HTML 預覽，且可使用瀏覽器列印功能輸出為 PDF，即視為完整可交付
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T054a [P] [US5] 建立後端單元 failing test：依 spec.md FR-013 定義驗證 `reportService.js` 可用率計算公式（以 `status_snapshots` 計算，不得只讀 `current_status`）；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
-- [ ] T054b [US5] 建立 Playwright E2E failing test（US5 主路徑）：選擇「拉拉手游泳學院」+ 當前月份 → 觸發產生 → 驗證月報 HTML 預覽顯示含可用率與告警統計；驗證「列印 / 另存 PDF」按鈕觸發 `window.print()`（不驗證服務端 PDF 下載）（`frontend/tests/e2e/monthly-report.spec.ts`）
+- [ ] T054a [P] [US5] 建立後端單元預期失敗測試：依 spec.md FR-013 定義驗證 `reportService.js` 可用率計算公式（以 `status_snapshots` 計算，不得只讀 `current_status`）；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
+- [ ] T054b [US5] 建立 Playwright E2E 預期失敗測試（US5 主路徑）：選擇「拉拉手游泳學院」+ 當前月份 → 觸發產生 → 驗證月報 HTML 預覽顯示含可用率與告警統計；驗證「列印 / 另存 PDF」按鈕觸發 `window.print()`（不驗證服務端 PDF 下載）（`frontend/tests/e2e/monthly-report.spec.ts`）
 
 ### 後端實作
 
@@ -238,20 +240,20 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **獨立測試**：高層管理者能在單一頁面看到所有場域設備健康度摘要（正常/警告/異常台數）、本月告警總數與上月比較，點選場域可跳轉設備總覽篩選視圖，即視為完整可交付
 
-### 測試先行（TDD — 先建立 Failing Tests，確認失敗後進入實作）
+### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T059a [P] [US6] 建立後端單元 failing test：驗證 `dashboardService.js` 跨場域統計聚合正確（normal/warning/fault/offline 計數總和 = 80）；驗證環比計算在上月 0 告警時不產生除零錯誤（`backend/tests/unit/dashboardService.test.js`）
-- [ ] T059b [US6] 建立 Playwright E2E failing test（US6 主路徑）：以 manager 角色進入老闆決策頁 → 驗證 3 個場域統計卡顯示 → 點選場域名稱 → 驗證跳轉至設備總覽並套用場域篩選（`frontend/tests/e2e/executive-dashboard.spec.ts`）
+- [ ] T059a [P] [US6] 建立後端單元預期失敗測試：驗證 `dashboardService.js` 跨場域統計聚合正確（normal/warning/fault/offline 計數總和 = 80）；驗證環比計算在上月 0 告警時不產生除零錯誤；驗證某場域本月告警數較上月增加至少 30% 且增加至少 3 筆時回傳需關注標記（`backend/tests/unit/dashboardService.test.js`）
+- [ ] T059b [US6] 建立 Playwright E2E 預期失敗測試（US6 主路徑）：以 manager 角色進入老闆決策頁 → 驗證 3 個場域統計卡顯示 → 點選場域名稱 → 驗證跳轉至設備總覽並套用場域篩選（`frontend/tests/e2e/executive-dashboard.spec.ts`）
 
 ### 後端實作
 
-- [ ] T059 [US6] 建立儀表板服務，聚合跨場域設備健康度統計（normal/warning/fault/offline 計數）、本月與上月告警數環比（`backend/src/services/dashboardService.js`）
-- [ ] T060 [US6] 建立老闆決策頁 API 路由 `GET /api/v1/dashboard/summary`，回傳 overall 彙總與各場域明細（`backend/src/api/dashboard.js`）
+- [ ] T059 [US6] 建立儀表板服務，聚合跨場域設備健康度統計（normal/warning/fault/offline 計數）、本月與上月告警數環比，並依「增加至少 30% 且增加至少 3 筆」規則標記需關注場域（`backend/src/services/dashboardService.js`）
+- [ ] T060 [US6] 建立老闆決策頁 API 路由 `GET /api/v1/dashboard/summary`，回傳 overall 彙總、各場域明細與需關注標記（`backend/src/api/dashboard.js`）
 
 ### 前端實作
 
 - [ ] T061 [US6] 建立 `useDashboardSummary` React Query Hook，60 秒自動刷新（`frontend/src/services/useDashboardSummary.ts`）
-- [ ] T062 [US6] 建立老闆決策頁，含整體健康度統計卡、各場域告警環比 Recharts BarChart（異常場域視覺化突顯）、點選場域名稱導航至設備總覽頁面（`frontend/src/pages/ExecutiveDashboard/index.tsx`）
+- [ ] T062 [US6] 建立老闆決策頁，含整體健康度統計卡、各場域告警環比 Recharts BarChart（依需關注標記視覺化突顯異常場域）、點選場域名稱導航至設備總覽頁面（`frontend/src/pages/ExecutiveDashboard/index.tsx`）
 
 **檢查點**：US6 獨立可測試 — 跨場域統計卡正確、環比趨勢柱狀圖顯示，點選場域可導航
 
@@ -264,13 +266,13 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T063 [P] 建立 InfluxDB Retention Policy 與 Continuous Query 初始化腳本（rp_raw 保留 365 天、rp_agg 保留無限期、兩個 CQ）（`backend/db/influxdb-setup.sh`）
 - [ ] T064 [P] 建立 Nginx 反向代理設定：`/` → React 靜態檔案（`/var/www/heatpump/dist`），`/api` → Node.js Express Port 3001（`nginx.conf`）
 - [ ] T065 [P] 補充 Seeder：每台真實設備加入 5 筆保養紀錄 + 各場域加入 10 筆歷史告警（含 open/resolved 混合狀態），支援 US3/US4 UI 驗收（`backend/db/seeders/002-seed-sample-data.js`）
-- [ ] T066 [P] 驗證邊界情境：場域所有設備離線時各頁面呈現、只有 1 台設備時風險排序版面、新增第 4 個場域時各頁面自動適應（根據驗收結果修正 `frontend/src/pages/DeviceOverview/index.tsx`、`frontend/src/pages/RiskRanking/index.tsx`）
+- [ ] T066 [P] 驗證邊界情境：場域所有設備離線時各頁面呈現、只有 1 台設備時風險排序版面、新增第 4 個場域時各頁面自動適應、月報月份內設備新增/移除時依實際納入監控期間計算可用率並標示設備數量變動（根據驗收結果修正 `frontend/src/pages/DeviceOverview/index.tsx`、`frontend/src/pages/RiskRanking/index.tsx`、`frontend/src/pages/MonthlyReport/index.tsx`、`backend/src/services/reportService.js`）
 - [ ] T067 依 `quickstart.md` 執行完整驗收流程：Migration → Seed → InfluxDB 初始化 → Node-RED 匯入流程 → 後端啟動 → 前端啟動 → 6 頁面逐一驗收情境；確認 80 台設備在設備總覽、風險排序、老闆決策頁皆能正確呈現（`specs/001-heatpump-dashboard-6pages/quickstart.md`）
 - [ ] T068 [P] 建立效能測試腳本：驗證設備總覽頁 80 台設備完整載入 ≤ 3 秒；使用 Playwright 計時或 Lighthouse CI 門檻強制驗收（`frontend/tests/e2e/performance.spec.ts`）
 - [ ] T069 [P] 建立月報效能測試：驗證任一場域任一月份月報產生 ≤ 30 秒（含後端 API 回應時間）（`backend/tests/integration/reportPerformance.test.js`）
 - [ ] T070 [P] 建立 API 效能測試腳本：主要 API（`/devices`、`/alerts`、`/risks`、`/dashboard/summary`）P95 回應 ≤ 500ms；整合至 CI gate（`backend/tests/performance/api-p95.test.js`）
 - [ ] T071 [P] 補全共用元件無障礙功能：`StatusDot`、`Badge`、所有互動元件加入 `aria-label`、`role`、鍵盤焦點樣式（`frontend/src/components/`）
-- [ ] T072 [P] 建立 Playwright + axe 無障礙測試：掃描 6 頁主要流程，確認無 critical accessibility violation（符合 WCAG 2.1 AA）（`frontend/tests/e2e/accessibility.spec.ts`）
+- [ ] T072 [P] 建立 Playwright + axe 無障礙測試：掃描 6 頁主要流程，確認無嚴重等級無障礙違規（符合 WCAG 2.1 AA）（`frontend/tests/e2e/accessibility.spec.ts`）
 
 ---
 
@@ -278,8 +280,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 階段依賴
 
-- **第一階段（Setup）**：無依賴，立即開始
-- **第二階段（Foundational）**：依賴第一階段完成，**阻塞第三至八階段所有工作**
+- **第一階段（專案初始化）**：無依賴，立即開始
+- **第二階段（基礎建設）**：依賴第一階段完成，**阻塞第三至八階段所有工作**
 - **第三至八階段（US1–US6）**：均依賴第二階段完成
   - 建議依優先順序：P1 → P2 → P3 → P4 → P5 → P6
   - 若有多人力，各故事可在基礎建設完成後平行開發
@@ -299,8 +301,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 故事內部執行順序
 
 ```
-後端：Service → API 路由（依賴 Model 已在 Phase 2 建立）
-前端：React Query Hook → 頁面元件（依賴 api.ts 已在 Phase 2 建立）
+後端：Service → API 路由（依賴 Model 已在第二階段建立）
+前端：React Query Hook → 頁面元件（依賴 api.ts 已在第二階段建立）
 ```
 
 ### 第二階段內部平行機會
@@ -318,7 +320,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ```
 TDD 先行（單人或雙人均先執行）
 ─────────────────────────────────────────────────
-T037a/b/c 建立 Failing Tests（確認失敗後再進入實作）
+T037a/b/c 建立預期失敗測試（確認失敗後再進入實作）
 
 後端開發者                           前端開發者
 ─────────────────────────────────────────────────
@@ -334,7 +336,7 @@ T039 [P] 建立 devices.js            （T040、T041 完成後）
 
 ### MVP 範圍（建議首次交付）
 
-完成 **T001–T042**（第一至三階段，含 TDD failing tests T037a/b/c）即構成可驗收的 MVP：
+完成 **T001–T042**（第一至三階段，含 TDD 預期失敗測試 T037a/b/c）即構成可驗收的 MVP：
 
 - 後端：sites API、devices API、mockDataService、alertEngine（排程運作）
 - 前端：設備總覽頁面顯示 80 台設備狀態、降級提示橫幅、角色切換 UI
@@ -345,7 +347,7 @@ T039 [P] 建立 devices.js            （T040、T041 完成後）
 
 | 迭代 | 涵蓋任務 | 交付內容 |
 |------|---------|---------|
-| 迭代 1（MVP） | T001–T042 | 設備總覽可運作（含 TDD failing tests） |
+| 迭代 1（MVP） | T001–T042 | 設備總覽可運作（含 TDD 預期失敗測試） |
 | 迭代 2 | T043a–T045 | + 風險排序 |
 | 迭代 3 | T046a–T050 | + 單機履歷 |
 | 迭代 4 | T051a–T053 | + 告警中心 |
