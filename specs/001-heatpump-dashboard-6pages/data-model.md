@@ -43,8 +43,10 @@ CREATE TABLE heat_pumps (
   name             VARCHAR(100)    NOT NULL COMMENT '設備顯示名稱',
   model            VARCHAR(100)    NOT NULL DEFAULT '' COMMENT '設備型號',
   installed_at     DATE            NOT NULL COMMENT '裝機日期',
+  monitoring_started_at DATETIME   NOT NULL COMMENT '納入監控開始時間，預設為裝機日期 00:00:00',
+  monitoring_ended_at   DATETIME   NULL     COMMENT '移除或停止納入監控時間（NULL = 仍納入監控）',
   is_mock          TINYINT(1)      NOT NULL DEFAULT 0 COMMENT '是否為 Mock 設備（0=真實，1=Mock）',
-  is_active        TINYINT(1)      NOT NULL DEFAULT 1 COMMENT '是否啟用',
+  is_active        TINYINT(1)      NOT NULL DEFAULT 1 COMMENT '是否仍納入即時監控',
   current_status   ENUM('normal','warning','fault','offline') NOT NULL DEFAULT 'offline'
                    COMMENT '設備目前狀態（由後端排程更新）',
   status_updated_at DATETIME       NULL     COMMENT '狀態最後更新時間',
@@ -55,14 +57,18 @@ CREATE TABLE heat_pumps (
   UNIQUE KEY uq_device_id (device_id),
   KEY idx_site_id (site_id),
   KEY idx_current_status (current_status),
+  KEY idx_monitoring_window (monitoring_started_at, monitoring_ended_at),
   CONSTRAINT fk_hp_site FOREIGN KEY (site_id) REFERENCES sites(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='熱泵設備主檔';
 ```
 
 **欄位說明**：
 - `device_id`：對應 InfluxDB measurement 中的 tag `device_id`，串接真實資料的關鍵欄位
+- `monitoring_started_at`：設備納入監控與月報可用率分母計算的開始時間；月中新增設備自此時間開始計算
+- `monitoring_ended_at`：設備移除或停止納入監控的時間；NULL 代表仍納入監控。月中移除設備計算至此時間或最後納入監控時間
 - `is_mock`：區分真實設備（3 台）與 Mock 設備（77 台）
 - `current_status`：由後端 5 分鐘排程更新，前端直接讀取此欄位，不需每次即時計算
+- `is_active = 0` 的設備不預設顯示於即時總覽，但其歷史資料、告警與狀態快照必須保留，供跨月月報與單機履歷查詢
 
 ---
 
@@ -187,6 +193,34 @@ CREATE TABLE monthly_reports (
 - 同一場域同一月份只能有一份月報（UNIQUE KEY）
 - `summary_html` 儲存後端產生的完整 HTML 字串，前端可直接 `innerHTML` 渲染並列印
 - 月報重新產生時更新現有記錄（UPSERT 語義）
+- `availability_pct` 必須由 `status_snapshots` 依設備實際納入監控期間計算，不得由 `heat_pumps.current_status` 推估
+- 報告月份內若任一設備的 `monitoring_started_at` 或 `monitoring_ended_at` 落在該月，`summary_html` 必須標示該月份設備數量曾變動
+
+---
+
+### 1.7 `status_snapshots`（設備狀態快照）
+
+```sql
+CREATE TABLE status_snapshots (
+  id               INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+  heat_pump_id     INT UNSIGNED    NOT NULL COMMENT 'FK → heat_pumps.id',
+  snapshot_at      DATETIME        NOT NULL COMMENT '狀態快照時間，需對齊 5 分鐘採集區間',
+  status           ENUM('normal','warning','fault','offline') NOT NULL COMMENT '該 5 分鐘區間的設備狀態',
+  source           VARCHAR(50)     NOT NULL DEFAULT 'statusUpdater' COMMENT '快照來源：InfluxDB/mock/statusUpdater',
+  created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hp_snapshot (heat_pump_id, snapshot_at),
+  KEY idx_snapshot_at (snapshot_at),
+  KEY idx_status (status),
+  CONSTRAINT fk_ss_hp FOREIGN KEY (heat_pump_id) REFERENCES heat_pumps(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='設備每 5 分鐘狀態快照';
+```
+
+**業務規則**：
+- `status_snapshots` 是 FR-014 指定的月報可用率唯一歷史來源；不得只讀 `heat_pumps.current_status` 回推歷史可用率
+- `statusUpdater` 每 5 分鐘為仍納入監控的設備寫入一筆快照；同一設備同一 `snapshot_at` 僅允許一筆記錄
+- 月報計算單台設備分母時，採用 `max(月初, monitoring_started_at)` 至 `min(次月月初, monitoring_ended_at 或次月月初)` 之間的 5 分鐘區間數
+- `normal` 與 `warning` 計為可用；`fault` 與 `offline` 計為不可用
 
 ---
 
@@ -195,10 +229,10 @@ CREATE TABLE monthly_reports (
 ```
 sites (1) ──────── (N) heat_pumps
                          │
-              ┌──────────┼───────────────┐
-              │          │               │
-    risk_assignments  alerts   maintenance_records
-    (N, history)      (N)             (N)
+              ┌──────────┼───────────────┬──────────────────┐
+              │          │               │                  │
+    risk_assignments  alerts   maintenance_records   status_snapshots
+    (N, history)      (N)             (N)              (N, 5m history)
 
 sites (1) ──── (N) monthly_reports
 ```
@@ -211,8 +245,8 @@ sites (1) ──── (N) monthly_reports
 
 **Tags**（索引維度，不變更）：
 ```
-device_id      = "HP-001"        # 對應 heat_pumps.device_id
-site_id        = "SITE-001"      # 場域識別
+device_id      = "SITE01-001"        # 對應 heat_pumps.device_id
+site_id        = "SITE01"         # 場域識別
 model          = "THP-500A"      # 設備型號（可用於按型號查詢）
 ```
 

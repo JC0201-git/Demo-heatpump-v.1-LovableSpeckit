@@ -52,20 +52,20 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### MySQL Migration 與 Sequelize Model
 
 - [ ] T011 建立 Migration：`sites` 資料表（id、name、address、contact、phone、is_active、created_at、updated_at）（`backend/db/migrations/001-create-sites.js`）
-- [ ] T012 [P] 建立 Migration：`heat_pumps` 資料表，含 `device_id` UNIQUE 鍵、`current_status` ENUM（normal/warning/fault/offline）（`backend/db/migrations/002-create-heat-pumps.js`）
+- [ ] T012 [P] 建立 Migration：`heat_pumps` 資料表，含 `device_id` UNIQUE 鍵、`installed_at`、`monitoring_started_at`、`monitoring_ended_at`、`is_active`、`current_status` ENUM（normal/warning/fault/offline），並建立 `idx_monitoring_window` 供月報依實際納入監控期間計算分母（`backend/db/migrations/002-create-heat-pumps.js`）
 - [ ] T013 [P] 建立 Migration：`risk_assignments` 資料表，含 `risk_level` ENUM（high/medium/low）、`is_current` 欄位、FK→heat_pumps（`backend/db/migrations/003-create-risk-assignments.js`）
 - [ ] T014 [P] 建立 Migration：`alerts` 資料表，含 `status` ENUM（open/acknowledged/resolved）、`alert_type` ENUM、完整生命週期欄位（`backend/db/migrations/004-create-alerts.js`）
 - [ ] T015 [P] 建立 Migration：`maintenance_records` 資料表，含 maintained_at、technician、maintenance_type、summary、parts_replaced、next_scheduled（`backend/db/migrations/005-create-maintenance-records.js`）
 - [ ] T016 [P] 建立 Migration：`monthly_reports` 資料表，含 UNIQUE KEY `(site_id, report_year, report_month)`、summary_html MEDIUMTEXT（`backend/db/migrations/006-create-monthly-reports.js`）
-- [ ] T016b [P] 建立 Migration：`status_snapshots` 資料表，含 `heat_pump_id`（FK→heat_pumps）、`snapshot_at` DATETIME、`status` ENUM（normal/warning/fault/offline）、`source` VARCHAR（InfluxDB/mock/statusUpdater）、`created_at`；建立複合索引 `(heat_pump_id, snapshot_at)`（`backend/db/migrations/007-create-status-snapshots.js`）
+- [ ] T016b [P] 建立 Migration：`status_snapshots` 資料表，含 `heat_pump_id`（FK→heat_pumps）、`snapshot_at` DATETIME（對齊 5 分鐘區間）、`status` ENUM（normal/warning/fault/offline）、`source` VARCHAR（InfluxDB/mock/statusUpdater）、`created_at`；建立唯一鍵 `(heat_pump_id, snapshot_at)`、`idx_snapshot_at` 與 `idx_status`，作為 FR-014 月報可用率唯一歷史來源（`backend/db/migrations/007-create-status-snapshots.js`）
 - [ ] T017 建立 Sequelize Model：`Site`，定義關聯 `hasMany(HeatPump)`、`hasMany(MonthlyReport)`（`backend/src/models/site.js`）
-- [ ] T018 [P] 建立 Sequelize Model：`HeatPump`，定義關聯 `belongsTo(Site)`、`hasMany(RiskAssignment)`、`hasMany(Alert)`、`hasMany(MaintenanceRecord)`（`backend/src/models/heatPump.js`）
+- [ ] T018 [P] 建立 Sequelize Model：`HeatPump`，定義 `monitoring_started_at`、`monitoring_ended_at` 欄位與關聯 `belongsTo(Site)`、`hasMany(RiskAssignment)`、`hasMany(Alert)`、`hasMany(MaintenanceRecord)`、`hasMany(StatusSnapshot)`（`backend/src/models/heatPump.js`）
 - [ ] T019 [P] 建立 Sequelize Model：`RiskAssignment`，含 `is_current` 業務規則說明（`backend/src/models/riskAssignment.js`）
 - [ ] T020 [P] 建立 Sequelize Model：`Alert`，定義生命週期 ENUM 與所有時間戳欄位（`backend/src/models/alert.js`）
 - [ ] T021 [P] 建立 Sequelize Model：`MaintenanceRecord`，定義 `belongsTo(HeatPump)` 關聯（`backend/src/models/maintenanceRecord.js`）
 - [ ] T022 [P] 建立 Sequelize Model：`MonthlyReport`，定義 `belongsTo(Site)` 關聯（`backend/src/models/monthlyReport.js`）
-- [ ] T022b [P] 建立 Sequelize Model：`StatusSnapshot`，定義 `belongsTo(HeatPump)` 關聯；用於月報可用率計算（`backend/src/models/statusSnapshot.js`）
-- [ ] T023 建立 Seeder：3 個場域（拉拉手游泳學院、洗衣廠、罐頭工廠）+ 3 台真實設備（`is_mock=0`）+ 77 台 Mock 設備（`is_mock=1`）；所有設備 `device_id` 統一使用 `SITExx-xxx` 格式（如 `SITE01-001`），真實設備與 Mock 設備皆遵守此格式；使用 @faker-js/faker 固定 seed 値確保可重現（`backend/db/seeders/001-sites-and-devices.js`）
+- [ ] T022b [P] 建立 Sequelize Model：`StatusSnapshot`，定義 `belongsTo(HeatPump)` 關聯、`(heat_pump_id, snapshot_at)` 唯一性與狀態 ENUM；用於月報可用率計算（`backend/src/models/statusSnapshot.js`）
+- [ ] T023 建立 Seeder：3 個場域（拉拉手游泳學院、洗衣廠、罐頭工廠）+ 3 台真實設備（`is_mock=0`）+ 77 台 Mock 設備（`is_mock=1`）；所有設備 `device_id` 統一使用 `SITExx-xxx` 格式（如 `SITE01-001`），並填入 `installed_at`、`monitoring_started_at`（預設等於裝機日 00:00:00）、`monitoring_ended_at=null`；使用 @faker-js/faker 固定 seed 値確保可重現（`backend/db/seeders/001-sites-and-devices.js`）
 
 ### InfluxDB 串接與 Mock 資料
 
@@ -79,12 +79,12 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T026a [P] 建立 alertEngine 預期失敗測試：驗證設備超過 5 分鐘無資料時產生離線告警（`backend/tests/unit/alertEngine.test.js`）
 - [ ] T026b [P] 建立 alertEngine 預期失敗測試：驗證 `error_code != 0` 時產生錯誤碼告警（`backend/tests/unit/alertEngine.test.js`）
-- [ ] T026c [P] 建立 alertEngine 預期失敗測試：驗證 warning/critical 門溻觸發對應設備狀態（`backend/tests/unit/alertEngine.test.js`）
+- [ ] T026c [P] 建立 alertEngine 預期失敗測試：驗證 warning/critical 門檻觸發對應設備狀態（`backend/tests/unit/alertEngine.test.js`）
 - [ ] T026d [P] 建立 statusUpdater 預期失敗測試：驗證排程重跑不產生重複告警（唯一性保護）（`backend/tests/unit/statusUpdater.test.js`）
-- [ ] T026e [P] 建立 statusUpdater 預期失敗測試：驗證排程上次失敗後，下次執行可補偵測遗漏的告警（`backend/tests/unit/statusUpdater.test.js`）
+- [ ] T026e [P] 建立 statusUpdater 預期失敗測試：驗證排程上次失敗後，下次執行可補偵測遺漏的告警（`backend/tests/unit/statusUpdater.test.js`）
 
 - [ ] T027 建立告警引擎，實作三種規則：離線偵測（`status_updated_at` 超過 5 分鐘）、錯誤碼偵測（`error_code != 0`）、溫度/壓力門檻超限；新告警寫入 `alerts` 表（`backend/src/services/alertEngine.js`）
-- [ ] T028 建立 node-cron 排程任務，每 5 分鐘執行：呼叫告警引擎 → 更新 `heat_pumps.current_status` → 同步寫入 `status_snapshots`（含 `heat_pump_id`、`snapshot_at`、`status`、`source='statusUpdater'`）→ 觸發離線告警（`backend/src/jobs/statusUpdater.js`）
+- [ ] T028 建立 node-cron 排程任務，每 5 分鐘執行：篩選目前仍在 `monitoring_started_at` 與 `monitoring_ended_at` 監控期間內的設備 → 呼叫告警引擎 → 更新 `heat_pumps.current_status` → 同步寫入 `status_snapshots`（含 `heat_pump_id`、`snapshot_at`、`status`、`source='statusUpdater'`，同一設備同一快照時間不得重複）→ 觸發離線告警（`backend/src/jobs/statusUpdater.js`）
 
 ### 系統健康度 API
 
@@ -120,7 +120,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T037 [US1] 建立場域 API 路由 `GET /api/v1/sites`，回傳所有啟用場域清單與各場域的設備狀態統計（normal/warning/fault/offline 計數）（`backend/src/api/sites.js`）
 - [ ] T038 [US1] 建立裝置服務，整合 MySQL 設備主檔、InfluxDB/Mock 即時資料，回傳含 `data_quality` 與 `degraded` 旗標的完整設備物件（`backend/src/services/deviceService.js`）
-- [ ] T039 [P] [US1] 建立設備 API 路由：`GET /api/v1/devices`（支援 site_id/status 篩選與分頁）、`GET /api/v1/devices/:device_id`（含 current_risk 與 latest_data）（`backend/src/api/devices.js`）
+- [ ] T039 [P] [US1] 建立設備 API 路由：`GET /api/v1/devices`（支援 site_id/status 篩選與分頁）、`GET /api/v1/devices/:device_id`（含 current_risk、latest_data、installed_at、monitoring_started_at、monitoring_ended_at）（`backend/src/api/devices.js`）
 
 ### 前端實作
 
@@ -145,7 +145,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 後端實作
 
-- [ ] T043 [US2] 建立風險排序 API 路由：`GET /api/v1/risks`（依 risk_level 降序排列，同等級依最後告警時間排序，支援 site_id 簾選）、`POST /api/v1/risks`（operator-only，新增指派時自動將同一設備舊紀錄 `is_current` 設為 0）（`backend/src/api/risks.js`）
+- [ ] T043 [US2] 建立風險排序 API 路由：`GET /api/v1/risks`（依 risk_level 降序排列，同等級依最後告警時間排序，支援 site_id 篩選）、`POST /api/v1/risks`（operator-only，新增指派時自動將同一設備舊紀錄 `is_current` 設為 0）（`backend/src/api/risks.js`）
 
 ### 前端實作
 
@@ -214,13 +214,13 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
-- [ ] T054a [P] [US5] 建立後端單元預期失敗測試：依 spec.md FR-013 定義驗證 `reportService.js` 可用率計算公式（以 `status_snapshots` 計算，不得只讀 `current_status`）；驗證月中新增設備自裝機日開始計算分母、月中移除設備計算至移除日或最後納入監控時間；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
+- [ ] T054a [P] [US5] 建立後端單元預期失敗測試：依 spec.md FR-013 定義驗證 `reportService.js` 可用率計算公式（以 `status_snapshots` 計算，不得只讀 `current_status`）；驗證月中新增設備自 `monitoring_started_at` 開始計算分母、月中移除設備計算至 `monitoring_ended_at` 或最後納入監控時間；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
 - [ ] T054b [US5] 建立 Playwright E2E 預期失敗測試（US5 主路徑）：選擇「拉拉手游泳學院」+ 當前月份 → 觸發產生 → 驗證月報 HTML 預覽顯示含可用率與告警統計；驗證「列印 / 另存 PDF」按鈕觸發 `window.print()`（不驗證服務端 PDF 下載）（`frontend/tests/e2e/monthly-report.spec.ts`）
 
 ### 後端實作
 
 - [ ] T054 [US5] 建立 ejs 月報模板，含場域設備可用率、告警次數、告警類型分布表格、重大事件摘要，加入 `@media print` CSS 控制列印頁眉/頁尾/分頁（頁首含場域名稱與報告月份）（`backend/src/templates/monthly-report.ejs`）
-- [ ] T055 [US5] 建立月報服務，從 MySQL 聚合月度告警統計（total/critical 計數）；依 `status_snapshots` 計算可用率（`status ∉ {fault, offline}` 的 5 分鐘區間數 ÷ 該設備在該月份實際納入監控期間的 5 分鐘區間數），月中新增自裝機日開始計算，月中移除計算至移除日或最後納入監控時間，並在報告中標示設備數量變動；不得只讀 `heat_pumps.current_status`；渲染 ejs 模板為 HTML 字串（`backend/src/services/reportService.js`）
+- [ ] T055 [US5] 建立月報服務，從 MySQL 聚合月度告警統計（total/critical 計數）；依 `status_snapshots` 計算可用率（`status ∉ {fault, offline}` 的 5 分鐘區間數 ÷ 該設備在該月份實際納入監控期間的 5 分鐘區間數），監控期間以 `max(月初, monitoring_started_at)` 到 `min(次月月初, monitoring_ended_at 或次月月初)` 計算；報告月份內有設備新增或移除時，於 HTML 標示設備數量曾變動；不得只讀 `heat_pumps.current_status`；渲染 ejs 模板為 HTML 字串（`backend/src/services/reportService.js`）
 - [ ] T056 [US5] 建立月報 API 路由：`POST /api/v1/reports/monthly`（manager-only，UPSERT 語義：同場域同月份已存在則更新）、`GET /api/v1/reports/monthly/:id`、`GET /api/v1/reports/monthly`（支援 site_id/year 篩選）（`backend/src/api/reports.js`）
 
 ### 前端實作
@@ -283,7 +283,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - **第三至八階段（US1–US6）**：均依賴第二階段完成
   - 建議依優先順序：P1 → P2 → P3 → P4 → P5 → P6
   - 若有多人力，各故事可在基礎建設完成後平行開發
-- **最終階段（Polish）**：依賴所有使用者故事完成
+- **最終階段（完善）**：依賴所有使用者故事完成
 
 ### 使用者故事相依關係
 

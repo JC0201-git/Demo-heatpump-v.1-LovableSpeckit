@@ -246,7 +246,7 @@ Mock 資料生成                    不直接回應前端
 |---------|---------|------|
 | 設備即時量測（溫度/壓力/電流） | InfluxDB | 時序資料，高寫入頻率 |
 | 電錶時序數據 | InfluxDB | 時序資料 |
-| 設備主檔（名稱/型號/裝機日期） | MySQL | 業務資料，不頻繁變動 |
+| 設備主檔（名稱/型號/裝機日期/納入監控期間） | MySQL | 業務資料，不頻繁變動 |
 | 場域資訊 | MySQL | 業務資料 |
 | 風險等級指派 | MySQL | 業務資料，需要歷史追蹤 |
 | 告警紀錄（完整生命週期） | MySQL | 業務資料，需要複雜查詢 |
@@ -263,7 +263,7 @@ Mock 資料生成                    不直接回應前端
 
 **資料表清單**：
 1. `sites`（客戶場域）
-2. `heat_pumps`（設備主檔，含 `current_status` 快取欄位）
+2. `heat_pumps`（設備主檔，含 `current_status` 快取欄位與 `monitoring_started_at`/`monitoring_ended_at` 監控期間）
 3. `risk_assignments`（風險等級歷史記錄）
 4. `alerts`（告警完整生命週期）
 5. `maintenance_records`（保養紀錄）
@@ -436,6 +436,7 @@ POST /api/v1/reports/monthly
     ↓
 後端聚合資料：
   MySQL: alerts（告警統計）
+  MySQL: heat_pumps（設備納入監控開始/結束時間，用於月中新增或移除分母）
   MySQL: status_snapshots（依 5 分鐘區間計算可用率的唯一來源）
   InfluxDB: power_meter（月用電量）
     ↓
@@ -454,7 +455,7 @@ ejs 模板渲染 HTML 字串
 ### 月報必要內容（v1）
 
 - 場域名稱 + 報告月份
-- 設備數量 + 可用率（%）
+- 設備數量 + 設備數量變動註記 + 可用率（%）
 - 告警次數 + 告警類型分布（表格）
 - 重大事件摘要（`critical` 告警清單）
 - 本月用電量（kWh）

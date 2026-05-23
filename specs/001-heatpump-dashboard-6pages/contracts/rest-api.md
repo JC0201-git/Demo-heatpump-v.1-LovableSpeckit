@@ -101,7 +101,7 @@
   "data": [
     {
       "id": 1,
-      "device_id": "HP-001",
+      "device_id": "SITE01-001",
       "name": "泳池熱泵 A",
       "model": "THP-500A",
       "site_id": 1,
@@ -110,6 +110,8 @@
       "current_status": "normal",
       "status_updated_at": "2026-05-23T10:00:00+08:00",
       "installed_at": "2024-01-15",
+      "monitoring_started_at": "2024-01-15T00:00:00+08:00",
+      "monitoring_ended_at": null,
       "risk_level": "low",           // 當前風險等級（null 若未指派）
       "data": {
         "temp_outlet":   28.5,
@@ -148,6 +150,8 @@
     "site_id": 1,
     "site_name": "拉拉手游泳學院",
     "installed_at": "2024-01-15",
+    "monitoring_started_at": "2024-01-15T00:00:00+08:00",
+    "monitoring_ended_at": null,
     "notes": "",
     "is_mock": false,
     "current_status": "normal",
@@ -393,6 +397,8 @@
 產生月報（建立或更新）。
 
 **角色限制**：僅 `manager`（高層管理者）可呼叫。
+
+**月報計算規則**：`availability_pct` 必須由 `status_snapshots` 計算，不得以 `heat_pumps.current_status` 回推。若報告月份內設備因 `monitoring_started_at` 或 `monitoring_ended_at` 造成設備數量變動，後端必須在 `summary_html` 中標示「本月設備數量曾變動」，並以各設備實際納入監控期間作為可用率分母。
 
 **請求 Body**：
 ```jsonc
