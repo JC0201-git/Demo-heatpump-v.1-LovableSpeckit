@@ -11,7 +11,7 @@
 為設備商內部維運團隊建立熱泵設備監控儀表板，支援 6 個頁面（設備總覽、風險排序、
 單機履歷、告警中心、月報雛形、老闆決策頁）。採用前後端分離架構，前端以 React（Lovable 基礎）
 搭配 Node.js Express 後端，資料源為 InfluxDB 1.8（時序）與 MySQL（業務資料）。
-v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色切換 Demo，
+v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色切換展示，
 不對外公開、不做正式登入驗證。
 
 ---
@@ -193,7 +193,7 @@ specs/
 | 角色管理 | `RoleContext`；localStorage 持久化；`X-Role` Header 注入 |
 | 缺欄位顯示 | `value ?? '--'`；趨勢圖斷線處理 |
 | 月報列印 | `window.print()` + `@media print` CSS |
-| 狀態指示 | `degraded` 旗標偵測；顯示「資料可能已過時」提示 |
+| 狀態指示 | `degraded` 旗標偵測；顯示「資料可能已過時」提示；`/api/v1/system/health` 輪詢間隔 ≤ 10 秒，回傳 `degraded` 或請求失敗時立即顯示降級提示 |
 
 ### 後端責任（Node.js Express）
 
@@ -229,9 +229,9 @@ Mock 資料生成                    不直接回應前端
 
 | Endpoint | 說明 |
 |----------|------|
-| `GET /influx/latest?device_id=HP-001` | 取得設備最新一筆量測資料 |
-| `GET /influx/history?device_id=HP-001&field=temp_outlet&from=...&to=...` | 取得歷史時序資料 |
-| `GET /influx/power-meter?device_id=HP-001&from=...&to=...` | 取得電錶資料 |
+| `GET /influx/latest?device_id=SITE01-001` | 取得設備最新一筆量測資料 |
+| `GET /influx/history?device_id=SITE01-001&field=temp_outlet&from=...&to=...` | 取得歷史時序資料 |
+| `GET /influx/power-meter?device_id=SITE01-001&from=...&to=...` | 取得電錶資料 |
 
 ---
 
@@ -248,6 +248,7 @@ Mock 資料生成                    不直接回應前端
 | 保養紀錄 | MySQL | 業務資料 |
 | 月報紀錄（含 HTML） | MySQL | 業務資料，不需時序特性 |
 | 設備目前狀態（`current_status`） | MySQL（`heat_pumps` 欄位） | 由後端排程更新，前端快速讀取 |
+| 設備狀態快照（每 5 分鐘） | MySQL `status_snapshots` 或 InfluxDB | 月報可用率歷史依據 |
 
 ---
 
@@ -262,6 +263,7 @@ Mock 資料生成                    不直接回應前端
 4. `alerts`（告警完整生命週期）
 5. `maintenance_records`（保養紀錄）
 6. `monthly_reports`（月報記錄含 HTML）
+7. `status_snapshots`（每 5 分鐘設備狀態快照，用於月報可用率計算）
 
 ---
 
@@ -283,7 +285,7 @@ Mock 資料生成                    不直接回應前端
 
 詳見 [contracts/rest-api.md](./contracts/rest-api.md) — 完整 Endpoint、請求/回傳格式、角色限制。
 
-**Endpoint 總覽**：
+**端點總覽**：
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
@@ -372,22 +374,22 @@ const THRESHOLDS = {
 
 ---
 
-## Mock Data / Seed Data 設計
+## 模擬資料與種子資料設計
 
 ### MySQL Seed 資料
 
 ```javascript
 // db/seeders/001-devices.js（使用 @faker-js/faker）
 const REAL_DEVICES = [
-  { device_id: 'HP-001', name: '泳池熱泵 A', site_id: 1, is_mock: false },
-  { device_id: 'HP-002', name: '泳池熱泵 B', site_id: 1, is_mock: false },
-  { device_id: 'HP-003', name: '熱水供應泵', site_id: 1, is_mock: false },
+  { device_id: 'SITE01-001', name: '泳池熱泵 A', site_id: 1, is_mock: false },
+  { device_id: 'SITE01-002', name: '泳池熱泵 B', site_id: 1, is_mock: false },
+  { device_id: 'SITE01-003', name: '熱水供應泵', site_id: 1, is_mock: false },
 ];
 
 // 產生 77 台 Mock 設備（固定 seed 確保重現性）
 faker.seed(42);
 const mockDevices = Array.from({ length: 77 }, (_, i) => ({
-  device_id: `MOCK-${String(i + 1).padStart(3, '0')}`,
+  device_id: `SITE0${(i % 3) + 1}-${String(i + 1).padStart(3, '0')}`,  // 格式：SITE01-001
   name: `模擬熱泵 ${i + 1}`,
   site_id: (i % 3) + 1,
   is_mock: true,
@@ -418,7 +420,7 @@ function generateMockSensorData(deviceId) {
 
 ---
 
-## 月報 HTML / PDF 預覽設計
+## 月報 HTML 預覽與瀏覽器列印另存 PDF 設計
 
 ### 產生流程
 
@@ -429,7 +431,7 @@ POST /api/v1/reports/monthly
     ↓
 後端聚合資料：
   MySQL: alerts（告警統計）
-  MySQL: heat_pumps（設備清單、可用率）
+  status_snapshots 或 InfluxDB 狀態序列（依 5 分鐘區間計算可用率）
   InfluxDB: power_meter（月用電量）
     ↓
 ejs 模板渲染 HTML 字串
@@ -441,6 +443,7 @@ ejs 模板渲染 HTML 字串
 前端 <div dangerouslySetInnerHTML> 渲染預覽
     ↓
 使用者點擊「列印 / 另存 PDF」→ window.print()
+（⚠️ v1 不產生服務端 PDF 檔案；使用者透過瀏覽器列印/另存 PDF 完成匯出）
 ```
 
 ### 月報必要內容（v1）
@@ -601,35 +604,41 @@ influxd backup -portable -database heatpump_db /backup/influxdb/$(date +%Y%m%d)
 17. `GET /dashboard/summary` API（**P6**）
 18. 老闆決策頁（**P6**）
 
+### TDD 優先策略
+
+所有使用者故事開始實作前，必須先將該故事的驗收情境轉為失敗的單元、整合或 E2E 測試；
+測試任務完成並確認失敗後，才能進入服務/API/頁面實作。
+
 ### 品質保證
 
-19. 後端單元測試（alertEngine、mockDataService、reportService）
-20. 後端整合測試（API Endpoints）
+19. 後端單元測試（alertEngine、statusUpdater 規則、mockDataService、reportService）
+20. 後端整合測試（API Endpoints）；效能測試（API P95 ≤ 500ms、月報 ≤ 30 秒、設備總覽 ≤ 3 秒）
 21. 前端單元測試（utils、components）
-22. E2E 測試（6 個頁面主要流程）
+22. E2E 測試（6 個頁面主要流程，覆蓋 80 台設備完整載入；7 台僅作人工展示樣本）
+23. 無障礙測試（WCAG 2.1 AA、鍵盤操作 / a11y 覆蓋率驗證）
 
 ---
 
 ## MVP 實作順序建議
 
 ```
-Week 1: 基礎建設（任務 1-5）+ 設備總覽（任務 6-7）
+第 1 週：基礎建設（任務 1-5）+ 設備總覽（任務 6-7）
          → 驗收：可看到 80 台設備狀態，真實設備有 InfluxDB 資料
 
-Week 2: 風險排序（任務 8-9）+ 單機履歷（任務 10-11）
+第 2 週：風險排序（任務 8-9）+ 單機履歷（任務 10-11）
          → 驗收：可指派風險等級、查看設備歷史趨勢圖
 
-Week 3: 告警中心（任務 12-14）
+第 3 週：告警中心（任務 12-14）
          → 驗收：告警自動偵測、確認、解決流程完整可用
 
-Week 4: 月報（任務 15-16）+ 老闆決策頁（任務 17-18）
+第 4 週：月報（任務 15-16）+ 老闆決策頁（任務 17-18）
          → 驗收：可產生 HTML 月報並列印為 PDF；決策頁顯示跨場域摘要
 
-Week 5: 測試（任務 19-22）+ Bug 修正 + EC2 部署驗證
-         → 驗收：全部 6 頁面通過驗收情境；80 台設備可用於展示
+第 5 週：測試（任務 19-23）+ Bug 修正 + EC2 部署驗證
+         → 驗收：全部 6 頁面通過驗收情境；80 台設備可用於 v1 展示
 ```
 
-**MVP 最小可交付（Week 1 結束）**：設備總覽頁面可展示 80 台設備狀態 → 符合 spec FR-001
+**MVP 最小可交付（第 1 週結束）**：設備總覽頁面可展示 80 台設備狀態 → 符合 spec FR-001
 
 ---
 
