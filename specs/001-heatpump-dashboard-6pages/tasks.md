@@ -45,7 +45,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 後端 Express 應用程式
 
 - [ ] T007 建立 Express 應用程式進入點，含 CORS、JSON 解析器、路由掛載骨架、PM2 進程啟動（`backend/src/app.js`）
-- [ ] T008 [P] 建立角色守衛中間件，讀取 `X-Role` Header 驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403（`backend/src/middleware/roleGuard.js`）
+- [ ] T008 [P] 建立角色守衛中間件，讀取 `X-Role` 標頭驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403（`backend/src/middleware/roleGuard.js`）
 - [ ] T009 [P] 建立全域錯誤處理中間件，依 REST API 契約格式輸出 `{ success: false, error: { code, message } }`（`backend/src/middleware/errorHandler.js`）
 - [ ] T010 建立 Sequelize 設定檔與 sequelize-cli 初始化設定，含 development/production 環境區分（`backend/src/config/database.js`、`backend/.sequelizerc`）
 
@@ -65,13 +65,13 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T021 [P] 建立 Sequelize Model：`MaintenanceRecord`，定義 `belongsTo(HeatPump)` 關聯（`backend/src/models/maintenanceRecord.js`）
 - [ ] T022 [P] 建立 Sequelize Model：`MonthlyReport`，定義 `belongsTo(Site)` 關聯（`backend/src/models/monthlyReport.js`）
 - [ ] T022b [P] 建立 Sequelize Model：`StatusSnapshot`，定義 `belongsTo(HeatPump)` 關聯、`(heat_pump_id, snapshot_at)` 唯一性與狀態 ENUM；用於月報可用率計算（`backend/src/models/statusSnapshot.js`）
-- [ ] T023 建立 Seeder：3 個場域（拉拉手游泳學院、洗衣廠、罐頭工廠）+ 3 台真實設備（`is_mock=0`）+ 77 台 Mock 設備（`is_mock=1`）；所有設備 `device_id` 統一使用 `SITExx-xxx` 格式（如 `SITE01-001`），並填入 `installed_at`、`monitoring_started_at`（預設等於裝機日 00:00:00）、`monitoring_ended_at=null`；使用 @faker-js/faker 固定 seed 値確保可重現（`backend/db/seeders/001-sites-and-devices.js`）
+- [ ] T023 建立種子資料腳本：3 個場域（拉拉手游泳學院、洗衣廠、罐頭工廠）+ 3 台真實設備（`is_mock=0`）+ 77 台模擬設備（`is_mock=1`）；所有設備 `device_id` 統一使用 `SITExx-xxx` 格式（如 `SITE01-001`），並填入 `installed_at`、`monitoring_started_at`（預設等於裝機日 00:00:00）、`monitoring_ended_at=null`；使用 @faker-js/faker 固定 seed 值確保可重現（`backend/db/seeders/001-sites-and-devices.js`）
 
-### InfluxDB 串接與 Mock 資料
+### InfluxDB 串接與模擬資料
 
-- [ ] T024 建立 Node-RED InfluxDB 查詢流程，暴露三個 HTTP Endpoint（查詢即時資料如 `device_id=SITE01-001`、查詢歷史時序、查詢日彙總）供後端 localhost 內部呼叫；所有 Endpoint 範例 device_id 使用 `SITExx-xxx` 格式（`node-red/flows.json`）
-- [ ] T025 建立 InfluxDB 串接服務，透過 Node-RED HTTP Endpoint 查詢 `heatpump_status` measurement，含連線失敗時回傳 `degraded` 旗標與最後已知資料（`backend/src/services/influxService.js`）
-- [ ] T026 [P] 建立 Mock 資料服務，依 `device_id` 動態生成溫度（temp_inlet/temp_outlet）、壓力、功率、error_code 等運行參數，對 `is_mock=1` 的設備使用此服務（`backend/src/services/mockDataService.js`）
+- [ ] T024 建立 Node-RED InfluxDB 查詢流程，暴露三個 HTTP 端點（查詢即時資料如 `device_id=SITE01-001`、查詢歷史時序、查詢日彙總）供後端 localhost 內部呼叫；所有端點範例 device_id 使用 `SITExx-xxx` 格式（`node-red/flows.json`）
+- [ ] T025 建立 InfluxDB 串接服務，透過 Node-RED HTTP 端點查詢 `heatpump_status` 量測表，含連線失敗時回傳 `degraded` 旗標與最後已知資料（`backend/src/services/influxService.js`）
+- [ ] T026 [P] 建立模擬資料服務，依 `device_id` 動態生成溫度（temp_inlet/temp_outlet）、壓力、功率、error_code 等運行參數，對 `is_mock=1` 的設備使用此服務（`backend/src/services/mockDataService.js`）
 
 ### 告警引擎
 
@@ -93,11 +93,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 前端基礎框架
 
 - [ ] T030 建立前端應用程式進入點，設定 React Router 六頁面路由骨架，掛載 React Query Provider 與 RoleContext Provider（`frontend/src/main.tsx`、`frontend/src/App.tsx`）
-- [ ] T031 [P] 建立 `RoleContext`，含 localStorage 持久化、角色切換下拉選單 UI（operator/manager）、`X-Role` Header 自動注入邏輯（`frontend/src/contexts/RoleContext.tsx`）
+- [ ] T031 [P] 建立 `RoleContext`，含 localStorage 持久化、角色切換下拉選單 UI（operator/manager）、`X-Role` 標頭自動注入邏輯（`frontend/src/contexts/RoleContext.tsx`）
 - [ ] T032 [P] 建立設計 Token，定義設備狀態顏色（normal=green、warning=yellow、fault=red、offline=gray）、字型、間距常數（`frontend/src/theme/tokens.ts`）
 - [ ] T033 [P] 建立共用 UI 元件：`StatusDot`（圓形設備狀態指示點）、`Badge`（角色/等級標籤）（`frontend/src/components/StatusDot.tsx`、`frontend/src/components/Badge.tsx`）
 - [ ] T034 [P] 建立工具函數：缺欄位回退顯示（`value ?? '--'`）、dayjs 日期格式化、ISO 8601 時間解析（`frontend/src/utils/format.ts`）
-- [ ] T035 建立 API 請求基礎函數，自動附加 `X-Role` Header、解析通用回傳格式（`{ success, data, degraded }`）、統一錯誤拋出（`frontend/src/services/api.ts`）
+- [ ] T035 建立 API 請求基礎函數，自動附加 `X-Role` 標頭、解析通用回傳格式（`{ success, data, degraded }`）、統一錯誤拋出（`frontend/src/services/api.ts`）
 - [ ] T036 [P] 建立系統健康度 Hook，每 10 秒輪詢 `/api/v1/system/health`；同時監聽任一主要 API 請求回傳 `degraded:true` 或請求失敗時立即更新 `isDegraded` 旗標，供各頁面顯示「資料可能已過時」橫幅（`frontend/src/services/useSystemHealth.ts`）
 
 **檢查點**：基礎建設就緒，所有使用者故事可開始實作
@@ -261,7 +261,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 **目的**：補全跨頁面整合、部署設定與端到端驗收
 
-- [ ] T063 [P] 建立 InfluxDB Retention Policy 與 Continuous Query 初始化腳本（rp_raw 保留 365 天、rp_agg 保留無限期、兩個 CQ）（`backend/db/influxdb-setup.sh`）
+- [ ] T063 [P] 建立 InfluxDB 保存策略與連續查詢初始化腳本（rp_raw 保留 365 天、rp_agg 保留無限期、兩個 CQ）（`backend/db/influxdb-setup.sh`）
 - [ ] T064 [P] 建立 Nginx 反向代理設定：`/` → React 靜態檔案（`/var/www/heatpump/dist`），`/api` → Node.js Express Port 3001（`nginx.conf`）
 - [ ] T065 [P] 補充 Seeder：每台真實設備加入 5 筆保養紀錄 + 各場域加入 10 筆歷史告警（含 open/resolved 混合狀態），支援 US3/US4 UI 驗收（`backend/db/seeders/002-seed-sample-data.js`）
 - [ ] T066 [P] 驗證邊界情境：場域所有設備離線時各頁面呈現、只有 1 台設備時風險排序版面、新增第 4 個場域時各頁面自動適應、月報月份內設備新增/移除時依實際納入監控期間計算可用率並標示設備數量變動（根據驗收結果修正 `frontend/src/pages/DeviceOverview/index.tsx`、`frontend/src/pages/RiskRanking/index.tsx`、`frontend/src/pages/MonthlyReport/index.tsx`、`backend/src/services/reportService.js`）
@@ -339,7 +339,7 @@ T039 [P] 建立 devices.js            （T040、T041 完成後）
 - 後端：sites API、devices API、mockDataService、alertEngine（排程運作）
 - 前端：設備總覽頁面顯示 80 台設備狀態、降級提示橫幅、角色切換 UI
 
-**MVP 驗收標準**：7 台真實設備狀態卡正常顯示、手動斷開 InfluxDB 後頁面顯示降級提示、角色切換後 X-Role Header 正確傳送
+**MVP 驗收標準**：7 台真實設備狀態卡正常顯示、手動斷開 InfluxDB 後頁面顯示降級提示、角色切換後 `X-Role` 標頭正確傳送
 
 ### 增量交付計畫
 

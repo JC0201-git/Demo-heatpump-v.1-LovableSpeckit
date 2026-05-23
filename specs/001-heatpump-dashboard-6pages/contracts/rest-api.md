@@ -144,7 +144,7 @@
   "success": true,
   "data": {
     "id": 1,
-    "device_id": "HP-001",
+    "device_id": "SITE01-001",
     "name": "泳池熱泵 A",
     "model": "THP-500A",
     "site_id": 1,
@@ -201,7 +201,7 @@
 {
   "success": true,
   "data": {
-    "device_id": "HP-001",
+    "device_id": "SITE01-001",
     "field": "temp_outlet",
     "resolution": "1h",
     "points": [
@@ -238,7 +238,7 @@
   "data": [
     {
       "heat_pump_id": 1,
-      "device_id": "HP-001",
+      "device_id": "SITE01-001",
       "name": "泳池熱泵 A",
       "site_name": "拉拉手游泳學院",
       "current_status": "warning",
@@ -521,12 +521,12 @@
 
 ## 角色限制規範
 
-| Endpoint | `operator`（維運人員） | `manager`（高層管理者） |
+| 端點 | `operator`（維運人員） | `manager`（高層管理者） |
 |----------|----------------------|----------------------|
 | `GET /api/v1/sites` | ✅ | ✅ |
 | `GET /api/v1/devices` | ✅ | ✅ |
-| `GET /api/v1/devices/:id` | ✅ | ✅ |
-| `GET /api/v1/devices/:id/history` | ✅ | ✅ |
+| `GET /api/v1/devices/:device_id` | ✅ | ✅ |
+| `GET /api/v1/devices/:device_id/history` | ✅ | ✅ |
 | `GET /api/v1/risks` | ✅ | ✅ |
 | `POST /api/v1/risks` | ✅ | ❌（403） |
 | `GET /api/v1/alerts` | ✅ | ✅ |
@@ -538,7 +538,7 @@
 | `GET /api/v1/dashboard/summary` | ❌（403） | ✅ |
 | `GET /api/v1/system/health` | ✅ | ✅ |
 
-**v1 角色驗證方式**：前端在每個請求的 HTTP Header 加入 `X-Role: operator` 或 `X-Role: manager`；
-後端讀取此 Header 判斷角色限制。
+**v1 角色驗證方式**：前端在每個請求的 HTTP 標頭加入 `X-Role: operator` 或 `X-Role: manager`；
+後端讀取此標頭判斷角色限制。
 
 **安全說明**：此機制僅用於 v1 Demo，不視為正式安全控制。v2 需替換為 JWT。

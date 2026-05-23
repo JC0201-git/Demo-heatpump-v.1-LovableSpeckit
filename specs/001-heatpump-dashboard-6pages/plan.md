@@ -11,7 +11,7 @@
 為設備商內部維運團隊建立熱泵設備監控儀表板，支援 6 個頁面（設備總覽、風險排序、
 單機履歷、告警中心、月報雛形、老闆決策頁）。採用前後端分離架構，前端以 React（Lovable 基礎）
 搭配 Node.js Express 後端，資料源為 InfluxDB 1.8（時序）與 MySQL（業務資料）。
-v1 以 80 台設備（3 台真實 + 77 台 Mock）為基準，支援內部角色切換展示，
+v1 以 80 台設備（3 台真實 + 77 台模擬）為基準，支援內部角色切換展示，
 不對外公開、不做正式登入驗證。
 
 ---
@@ -138,20 +138,20 @@ specs/
 │                                                                      │
 │   Node.js Express（Port 3001）                                       │
 │     ├── REST API 路由（/api/v1/...）                                  │
-│     ├── 角色中間件（X-Role Header 驗證）                               │
+│     ├── 角色中間件（X-Role 標頭驗證）                                  │
 │     ├── MySQL 存取（透過 Sequelize）                                   │
-│     ├── InfluxDB 存取（透過 Node-RED HTTP Endpoint）                  │
-│     ├── Mock 資料生成（mockDataService）                               │
+│     ├── InfluxDB 存取（透過 Node-RED HTTP 端點）                       │
+│     ├── 模擬資料生成（mockDataService）                                │
 │     ├── 告警引擎（node-cron，每 5 分鐘）                               │
 │     └── 月報服務（ejs 模板產生 HTML）                                  │
 │                                                                      │
 │   Node-RED（Port 1880，僅內部）                                       │
 │     ├── InfluxDB 查詢流程                                             │
 │     ├── 資料格式轉換                                                  │
-│     └── HTTP Endpoint（僅允許 localhost:3001 呼叫）                   │
+│     └── HTTP 端點（僅允許 localhost:3001 呼叫）                        │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
-         │ Private Subnet（AWS VPC）
+         │ 私有子網（AWS VPC）
          │ MySQL: Port 3306（僅 EC2-1 SG 允許）
          │ InfluxDB: Port 8086（僅 EC2-1 SG 允許）
          ▼
@@ -170,9 +170,9 @@ specs/
 
 | 資源 | 配置 |
 |------|------|
-| VPC | 單一 VPC，包含 Public Subnet（EC2-1）與 Private Subnet（EC2-2）|
-| EC2-1 Security Group | Inbound: 80/443（0.0.0.0/0）；Outbound: 3306/8086 → EC2-2 SG |
-| EC2-2 Security Group | Inbound: 3306/8086（來源：EC2-1 Security Group ID）；無 Public IP |
+| VPC | 單一 VPC，包含公有子網（EC2-1）與私有子網（EC2-2）|
+| EC2-1 安全群組 | 入站: 80/443（0.0.0.0/0）；出站: 3306/8086 → EC2-2 安全群組 |
+| EC2-2 安全群組 | 入站: 3306/8086（來源：EC2-1 安全群組 ID）；無公網 IP |
 | Node-RED | 僅 localhost 可存取（127.0.0.1:1880），不對外暴露 |
 
 ### 服務分工
@@ -195,7 +195,7 @@ specs/
 |------|------|
 | 頁面路由 | React Router；根據角色控制路由存取 |
 | 資料請求 | React Query；60 秒自動刷新；錯誤降級顯示 |
-| 角色管理 | `RoleContext`；localStorage 持久化；`X-Role` Header 注入 |
+| 角色管理 | `RoleContext`；localStorage 持久化；`X-Role` 標頭注入 |
 | 缺欄位顯示 | `value ?? '--'`；趨勢圖斷線處理 |
 | 月報列印 | `window.print()` + `@media print` CSS |
 | 狀態指示 | `degraded` 旗標偵測；顯示「資料可能已過時」提示；`/api/v1/system/health` 輪詢間隔 ≤ 10 秒，回傳 `degraded` 或請求失敗時立即顯示降級提示 |
@@ -204,13 +204,13 @@ specs/
 
 | 功能 | 說明 |
 |------|------|
-| REST API | 完整 CRUD for 設備、告警、風險、月報、場域 |
+| REST API | 提供設備、告警、風險、月報、場域的建立、讀取、更新、刪除功能 |
 | MySQL 存取 | Sequelize ORM |
-| InfluxDB 存取 | 透過 Node-RED HTTP Endpoint |
-| Mock 資料 | `mockDataService`：77 台 Mock 設備即時參數動態生成 |
+| InfluxDB 存取 | 透過 Node-RED HTTP 端點 |
+| 模擬資料 | `mockDataService`：77 台模擬設備即時參數動態生成 |
 | 告警引擎 | `node-cron` 每 5 分鐘掃描；離線/錯誤碼/門檻規則 |
 | 月報產生 | `ejs` 模板渲染 HTML；聚合 MySQL + InfluxDB 資料 |
-| 角色驗證 | `roleGuard` 中間件讀取 `X-Role` Header |
+| 角色驗證 | `roleGuard` 中間件讀取 `X-Role` 標頭 |
 | 系統健康度 | `/api/v1/system/health` 回報 MySQL/InfluxDB/Node-RED 狀態 |
 
 ---
@@ -225,14 +225,14 @@ Node.js 後端（業務層）           Node-RED（串接層）
 MySQL CRUD                       InfluxQL 查詢執行
 告警規則評定                      原始資料格式轉換（→ JSON Array）
 月報彙整                         回傳標準化資料給 Node.js
-Mock 資料生成                    不直接回應前端
+模擬資料生成                    不直接回應前端
                                  不執行業務邏輯
                                  不寫入 MySQL
 ```
 
-**Node-RED 提供的內部 Endpoint**（僅 localhost 可存取）：
+**Node-RED 提供的內部端點**（僅 localhost 可存取）：
 
-| Endpoint | 說明 |
+| 端點 | 說明 |
 |----------|------|
 | `GET /influx/latest?device_id=SITE01-001` | 取得設備最新一筆量測資料 |
 | `GET /influx/history?device_id=SITE01-001&field=temp_outlet&from=...&to=...` | 取得歷史時序資料 |
@@ -272,11 +272,11 @@ Mock 資料生成                    不直接回應前端
 
 ---
 
-## InfluxDB Measurement 建議
+## InfluxDB 量測表建議
 
-詳見 [data-model.md](./data-model.md) — 包含完整 tag/field 設計與 CQ 語句。
+詳見 [data-model.md](./data-model.md) — 包含完整標籤、欄位設計與連續查詢語句。
 
-| Measurement | 說明 |
+| 量測表 | 說明 |
 |-------------|------|
 | `heatpump_status`（rp_raw） | 每 5 分鐘原始資料，保留 365 天 |
 | `heatpump_status_1h`（rp_agg） | 每小時彙總，永久保存 |
@@ -288,7 +288,7 @@ Mock 資料生成                    不直接回應前端
 
 ## REST API 初步設計
 
-詳見 [contracts/rest-api.md](./contracts/rest-api.md) — 完整 Endpoint、請求/回傳格式、角色限制。
+詳見 [contracts/rest-api.md](./contracts/rest-api.md) — 完整端點、請求/回傳格式、角色限制。
 
 **端點總覽**：
 
@@ -296,8 +296,8 @@ Mock 資料生成                    不直接回應前端
 |------|------|------|
 | GET | `/api/v1/sites` | 場域清單 |
 | GET | `/api/v1/devices` | 設備清單（含狀態/即時資料） |
-| GET | `/api/v1/devices/:id` | 設備詳情 |
-| GET | `/api/v1/devices/:id/history` | 設備歷史時序（InfluxDB） |
+| GET | `/api/v1/devices/:device_id` | 設備詳情 |
+| GET | `/api/v1/devices/:device_id/history` | 設備歷史時序（InfluxDB） |
 | GET | `/api/v1/risks` | 風險排序清單 |
 | POST | `/api/v1/risks` | 指派/更新風險等級（operator 限定） |
 | GET | `/api/v1/alerts` | 告警清單（可篩選） |
@@ -318,7 +318,7 @@ Mock 資料生成                    不直接回應前端
 |------|-------------|---------|
 | 設備總覽 | `GET /devices`、`GET /sites` | 60 秒自動刷新 |
 | 風險排序 | `GET /risks` | 60 秒自動刷新 |
-| 單機履歷 | `GET /devices/:id`、`GET /devices/:id/history` | 手動刷新（時序圖） |
+| 單機履歷 | `GET /devices/:device_id`、`GET /devices/:device_id/history` | 手動刷新（時序圖） |
 | 告警中心 | `GET /alerts`、`PATCH /alerts/:id/acknowledge`、`PATCH /alerts/:id/resolve` | 60 秒自動刷新 |
 | 月報雛形 | `POST /reports/monthly`、`GET /reports/monthly/:id` | 手動觸發 |
 | 老闆決策頁 | `GET /dashboard/summary`、`GET /sites` | 60 秒自動刷新 |
@@ -334,12 +334,12 @@ Mock 資料生成                    不直接回應前端
   ├── 儲存：localStorage['heatpump_role'] = 'operator' | 'manager'
   ├── 路由守衛：manager 頁面（月報、決策頁）在 operator 角色時顯示「無存取權限」
   ├── UI 控制：operator 角色顯示操作按鈕；manager 角色隱藏寫入操作
-  └── HTTP Header：所有 API 請求附加 X-Role: {role}
+  └── HTTP 標頭：所有 API 請求附加 X-Role: {role}
 
 後端 roleGuard 中間件
-  ├── 讀取 X-Role Header
-  ├── 若角色不符合 Endpoint 要求 → 回傳 403
-  └── 若 Header 缺失 → 預設為 operator（v1 行為）
+  ├── 讀取 X-Role 標頭
+  ├── 若角色不符合端點要求 → 回傳 403
+  └── 若標頭缺失 → 預設為 operator（v1 行為）
 ```
 
 ### v2 預留設計
@@ -381,7 +381,7 @@ const THRESHOLDS = {
 
 ## 模擬資料與種子資料設計
 
-### MySQL Seed 資料
+### MySQL 種子資料
 
 ```javascript
 // db/seeders/001-devices.js（使用 @faker-js/faker）
@@ -391,7 +391,7 @@ const REAL_DEVICES = [
   { device_id: 'SITE01-003', name: '熱水供應泵', site_id: 1, is_mock: false },
 ];
 
-// 產生 77 台 Mock 設備（固定 seed 確保重現性）
+// 產生 77 台模擬設備（固定 seed 確保重現性）
 faker.seed(42);
 const mockDevices = Array.from({ length: 77 }, (_, i) => ({
   device_id: `SITE0${(i % 3) + 1}-${String(i + 1).padStart(3, '0')}`,  // 格式：SITE01-001
@@ -420,7 +420,7 @@ function generateMockSensorData(deviceId) {
 **混合回傳策略**：`GET /api/v1/devices` 呼叫後端時：
 1. 從 MySQL 取得全部 80 台設備主檔
 2. 真實設備（3 台）→ 呼叫 Node-RED 取得 InfluxDB 資料
-3. Mock 設備（77 台）→ 呼叫 `mockDataService` 動態生成
+3. 模擬設備（77 台）→ 呼叫 `mockDataService` 動態生成
 4. 合併後統一回傳
 
 ---
@@ -497,7 +497,7 @@ ejs 模板渲染 HTML 字串
 | 設備總覽（80 台） | `current_status` 快取於 MySQL；不每次即時查 InfluxDB |
 | 歷史趨勢圖 | 依時間範圍自動選擇原始/小時/日彙總資料 |
 | 月報產生 | 後端非同步聚合；月報快取於 `monthly_reports` 表，重複請求直接回傳快取 |
-| 設備詳情 | `GET /devices/:id` 只查單台，不載入其他設備資料 |
+| 設備詳情 | `GET /devices/:device_id` 只查單台，不載入其他設備資料 |
 
 ### 錯誤處理
 
@@ -523,7 +523,7 @@ ejs 模板渲染 HTML 字串
 
 | 項目 | 措施 |
 |------|------|
-| 資料庫隔離 | EC2-2 無 Public IP；安全群組僅允許 EC2-1 |
+| 資料庫隔離 | EC2-2 無公網 IP；安全群組僅允許 EC2-1 |
 | Node-RED 隔離 | 僅 localhost 可存取（127.0.0.1:1880） |
 | SQL Injection | Sequelize parameterized query（不拼接字串） |
 | XSS（月報 HTML） | `summary_html` 由後端模板產生（不接受使用者輸入的 HTML） |
@@ -575,12 +575,12 @@ influxd backup -portable -database heatpump_db /backup/influxdb/$(date +%Y%m%d)
 | 風險 | 可能性 | 影響 | 因應方案 |
 |------|-------|------|---------|
 | InfluxDB 1.8 連線不穩 | 中 | 高 | `degraded` 模式降級；`current_status` MySQL 快取 |
-| Mock 資料與真實資料混合查詢效能 | 低 | 中 | 後端並行查詢（Promise.allSettled）；Mock 資料純記憶體生成 |
+| 模擬資料與真實資料混合查詢效能 | 低 | 中 | 後端並行查詢（Promise.allSettled）；模擬資料純記憶體生成 |
 | 月報生成超過 30 秒 | 低 | 中 | 使用 InfluxDB 彙總資料（rp_agg 日彙總）而非原始資料 |
 | Node-RED 流程修改影響後端 | 中 | 中 | 定義清楚的內部 HTTP 契約；Node-RED 輸出格式固定 |
 | Lovable 前端結構與計畫不符 | 中 | 中 | 後端 API 設計以前端需求為主；前端路由/頁面結構可調整 |
 | 告警遺漏（node-cron 失敗） | 低 | 高 | 錯誤捕捉 + 日誌；下次排程補偵測；告警唯一性檢查（避免重複） |
-| EC2-2 磁碟滿（InfluxDB） | 中 | 高 | 設定 Retention Policy；監控磁碟使用率 |
+| EC2-2 磁碟滿（InfluxDB） | 中 | 高 | 設定保存策略；監控磁碟使用率 |
 
 ---
 
@@ -589,18 +589,18 @@ influxd backup -portable -database heatpump_db /backup/influxdb/$(date +%Y%m%d)
 ### 基礎建設（必須最先完成）
 
 1. MySQL Migration 與 Seed（場域 + 設備主檔）
-2. InfluxDB Retention Policy + Continuous Query 設定
-3. Node-RED InfluxDB 串接流程（內部 HTTP Endpoint）
+2. InfluxDB 保存策略 + 連續查詢設定
+3. Node-RED InfluxDB 串接流程（內部 HTTP 端點）
 4. Express 後端骨架（路由結構、錯誤處理、roleGuard 中間件）
 5. React 前端骨架（RoleContext、React Query 設定、共用 theme）
 
 ### 核心功能（依 spec 優先級）
 
-6. `GET /devices` API + 混合真實/Mock 資料邏輯（**P1 MVP**）
+6. `GET /devices` API + 混合真實/模擬資料邏輯（**P1 MVP**）
 7. 設備總覽頁面（**P1 MVP**）
 8. `GET /risks` + `POST /risks` API（**P2**）
 9. 風險排序頁面（**P2**）
-10. `GET /devices/:id` + `GET /devices/:id/history` API（**P3**）
+10. `GET /devices/:device_id` + `GET /devices/:device_id/history` API（**P3**）
 11. 單機履歷頁面（**P3**）
 12. `GET /alerts` + `PATCH /alerts/:id/acknowledge` + `PATCH /alerts/:id/resolve` API（**P4**）
 13. 告警引擎（node-cron 離線/錯誤碼/門檻）（**P4**）
@@ -618,7 +618,7 @@ influxd backup -portable -database heatpump_db /backup/influxdb/$(date +%Y%m%d)
 ### 品質保證
 
 19. 後端單元測試（alertEngine、statusUpdater 規則、mockDataService、reportService）
-20. 後端整合測試（API Endpoints）；效能測試（API P95 ≤ 500ms、月報 ≤ 30 秒、設備總覽 ≤ 3 秒）
+20. 後端整合測試（API 端點）；效能測試（API P95 ≤ 500ms、月報 ≤ 30 秒、設備總覽 ≤ 3 秒）
 21. 前端單元測試（utils、components）
 22. E2E 測試（6 個頁面主要流程，覆蓋 80 台設備完整載入；7 台僅作人工展示樣本）
 23. 無障礙測試（WCAG 2.1 AA、鍵盤操作 / a11y 覆蓋率驗證）

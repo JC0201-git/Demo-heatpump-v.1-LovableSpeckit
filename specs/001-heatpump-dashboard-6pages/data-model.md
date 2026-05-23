@@ -2,7 +2,7 @@
 
 **所屬功能分支**：`001-heatpump-dashboard-6pages`
 **建立日期**：2026-05-23
-**階段**：Phase 1 — 資料模型設計
+**階段**：第 1 階段 — 資料模型設計
 
 ---
 
@@ -26,10 +26,10 @@ CREATE TABLE sites (
 
 **索引**：PRIMARY KEY(id)
 
-**Seed 資料**：
-- 拉拉手游泳學院（3 台真實 + 若干 Mock）
-- 洗衣廠（若干 Mock）
-- 罐頭工廠（若干 Mock）
+**種子資料**：
+- 拉拉手游泳學院（3 台真實 + 若干模擬設備）
+- 洗衣廠（若干模擬設備）
+- 罐頭工廠（若干模擬設備）
 
 ---
 
@@ -45,7 +45,7 @@ CREATE TABLE heat_pumps (
   installed_at     DATE            NOT NULL COMMENT '裝機日期',
   monitoring_started_at DATETIME   NOT NULL COMMENT '納入監控開始時間，預設為裝機日期 00:00:00',
   monitoring_ended_at   DATETIME   NULL     COMMENT '移除或停止納入監控時間（NULL = 仍納入監控）',
-  is_mock          TINYINT(1)      NOT NULL DEFAULT 0 COMMENT '是否為 Mock 設備（0=真實，1=Mock）',
+  is_mock          TINYINT(1)      NOT NULL DEFAULT 0 COMMENT '是否為模擬設備（0=真實，1=模擬）',
   is_active        TINYINT(1)      NOT NULL DEFAULT 1 COMMENT '是否仍納入即時監控',
   current_status   ENUM('normal','warning','fault','offline') NOT NULL DEFAULT 'offline'
                    COMMENT '設備目前狀態（由後端排程更新）',
@@ -63,10 +63,10 @@ CREATE TABLE heat_pumps (
 ```
 
 **欄位說明**：
-- `device_id`：對應 InfluxDB measurement 中的 tag `device_id`，串接真實資料的關鍵欄位
+- `device_id`：對應 InfluxDB 量測表中的標籤 `device_id`，串接真實資料的關鍵欄位
 - `monitoring_started_at`：設備納入監控與月報可用率分母計算的開始時間；月中新增設備自此時間開始計算
 - `monitoring_ended_at`：設備移除或停止納入監控的時間；NULL 代表仍納入監控。月中移除設備計算至此時間或最後納入監控時間
-- `is_mock`：區分真實設備（3 台）與 Mock 設備（77 台）
+- `is_mock`：區分真實設備（3 台）與模擬設備（77 台）
 - `current_status`：由後端 5 分鐘排程更新，前端直接讀取此欄位，不需每次即時計算
 - `is_active = 0` 的設備不預設顯示於即時總覽，但其歷史資料、告警與狀態快照必須保留，供跨月月報與單機履歷查詢
 
@@ -243,14 +243,14 @@ sites (1) ──── (N) monthly_reports
 
 ### 3.1 `heatpump_status`（熱泵設備時序資料）
 
-**Tags**（索引維度，不變更）：
+**標籤**（索引維度，不變更）：
 ```
 device_id      = "SITE01-001"        # 對應 heat_pumps.device_id
 site_id        = "SITE01"         # 場域識別
 model          = "THP-500A"      # 設備型號（可用於按型號查詢）
 ```
 
-**Fields**（數值量測，可缺欄位）：
+**欄位**（數值量測，可缺欄位）：
 ```
 temp_inlet       float   # 進水溫度（°C）
 temp_outlet      float   # 出水溫度（°C）
@@ -272,7 +272,7 @@ compressor_hz    float   # 壓縮機頻率（Hz，可缺）
 
 **採集週期**：每 5 分鐘
 
-**Retention Policy**：
+**保存策略**：
 ```
 CREATE RETENTION POLICY "rp_raw" ON "heatpump_db"
   DURATION 365d REPLICATION 1 DEFAULT;
@@ -281,7 +281,7 @@ CREATE RETENTION POLICY "rp_agg" ON "heatpump_db"
   DURATION INF REPLICATION 1;
 ```
 
-**Continuous Query（每小時彙總）**：
+**連續查詢（每小時彙總）**：
 ```sql
 CREATE CONTINUOUS QUERY "cq_heatpump_1h"
 ON "heatpump_db"
@@ -297,7 +297,7 @@ BEGIN
 END;
 ```
 
-**Continuous Query（每日彙總）**：
+**連續查詢（每日彙總）**：
 ```sql
 CREATE CONTINUOUS QUERY "cq_heatpump_1d"
 ON "heatpump_db"
@@ -316,14 +316,14 @@ END;
 
 ### 3.2 `power_meter`（智慧電錶時序資料）
 
-**Tags**：
+**標籤**：
 ```
-device_id      = "HP-001"        # 對應熱泵設備 device_id
-site_id        = "SITE-001"
+device_id      = "SITE01-001"    # 對應熱泵設備 device_id
+site_id        = "SITE01"
 meter_id       = "MTR-001"       # 電錶識別（一台熱泵可能有多個電錶）
 ```
 
-**Fields**：
+**欄位**：
 ```
 power_kw         float   # 即時功率（kW）
 voltage          float   # 電壓（V）
@@ -335,7 +335,7 @@ freq_hz          float   # 頻率（Hz，可缺）
 
 **採集週期**：每 5 分鐘
 
-**Retention Policy**：同 `heatpump_status`，使用 `rp_raw`（365d）與 `rp_agg`（INF）
+**保存策略**：同 `heatpump_status`，使用 `rp_raw`（365d）與 `rp_agg`（INF）
 
 ---
 
@@ -343,12 +343,12 @@ freq_hz          float   # 頻率（Hz，可缺）
 
 **用途**：Node-RED 每 5 分鐘寫入，供設備總覽頁面快速讀取（避免即時計算全部設備狀態）
 
-**Tags**：
+**標籤**：
 ```
-site_id        = "SITE-001"
+site_id        = "SITE01"
 ```
 
-**Fields**：
+**欄位**：
 ```
 total_devices    integer  # 設備總數
 normal_count     integer  # 正常台數
@@ -394,7 +394,7 @@ function normalizeDeviceData(raw: Record<string, unknown>) {
 
 ```jsonc
 {
-  "device_id": "HP-001",
+  "device_id": "SITE01-001",
   "name": "設備 A",
   "current_status": "normal",
   "last_seen_at": "2026-05-23T10:00:00+08:00",
