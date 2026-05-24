@@ -22,7 +22,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T002 [P] 依實作計畫建立前端目錄結構（`frontend/src/{components,pages/{DeviceOverview,RiskRanking,DeviceHistory,AlertCenter,MonthlyReport,ExecutiveDashboard},services,contexts,theme,utils}/`、`frontend/tests/`）
 - [ ] T003 初始化後端 Node.js 專案，設定 npm `save-exact=true`，以精確版本安裝 express、sequelize、mysql2、node-influx、node-cron、ejs、@faker-js/faker、axios、dotenv、cors、sequelize-cli、jest、nodemon（`backend/package.json`、`backend/package-lock.json`）
 - [ ] T004 [P] 初始化前端 React + TypeScript 專案，設定 npm `save-exact=true`，以精確版本安裝 @tanstack/react-query、react-router-dom、recharts、dayjs、vitest、@playwright/test（`frontend/package.json`、`frontend/package-lock.json`）
-- [ ] T005 [P] 建立後端環境變數範本，涵蓋 PORT、DB_HOST/PORT/NAME/USER/PASS、INFLUXDB_HOST/PORT/DATABASE、NODERED_BASE_URL、ALERT_CHECK_INTERVAL_MINUTES、DEVICE_OFFLINE_THRESHOLD_MINUTES（`backend/.env.example`）
+- [ ] T005 [P] 建立後端環境變數範本，涵蓋 PORT、DB_HOST/PORT/NAME/USER/PASS、INFLUXDB_HOST/PORT/DATABASE、NODERED_BASE_URL、ALLOWED_ORIGINS、ALERT_CHECK_INTERVAL_MINUTES、DEVICE_OFFLINE_THRESHOLD_MINUTES（`backend/.env.example`）
 - [ ] T006 [P] 設定後端與前端 ESLint + Prettier（`backend/.eslintrc.json`、`backend/.prettierrc`、`frontend/.eslintrc.json`、`frontend/.prettierrc`）
 - [ ] T006b [P] 建立 CI 與品質閘門：lint、unit/integration/E2E coverage >= 80%、精確依賴檢查、6 頁 Lighthouse CI、Playwright screenshot/visual regression、bundle gzip 增量 <= 10 kB（`.github/workflows/ci.yml`、`.lighthouserc.json`、`scripts/check-exact-deps.mjs`、`frontend/scripts/check-bundle-budget.mjs`、`frontend/bundle-budget.json`）
 
@@ -32,10 +32,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 後端 Express 應用程式
 
-- [ ] T007 建立 Express 應用程式進入點，含 CORS、JSON parser、路由掛載骨架、PM2 啟動設定（`backend/src/app.js`）
+- [ ] T007 建立 Express 應用程式進入點，含 CORS 白名單、JSON parser、路由掛載骨架、PM2 啟動設定（`backend/src/app.js`）
 - [ ] T007a [P] 建立 roleGuard 預期失敗測試：缺少 `X-Role`、角色值無效、角色不符合端點要求皆回傳 HTTP 403；不得預設為 operator（`backend/tests/unit/roleGuard.test.js`）
 - [ ] T008 建立角色守衛中間件，讀取 `X-Role` 驗證 `operator`/`manager`，並支援月報 manager 報表操作例外（`backend/src/middleware/roleGuard.js`）
 - [ ] T009 [P] 建立全域錯誤處理中間件，依 REST API 契約輸出 `{ success: false, error: { code, message } }`（`backend/src/middleware/errorHandler.js`）
+- [ ] T009a [P] 建立安全與網路預期失敗測試：未允許 Origin 被 CORS 拒絕、主要查詢 API 惡意查詢參數不造成 SQL Injection、月報 HTML 不接受外部 HTML、缺少/無效 `X-Role` 仍回傳 403（`backend/tests/integration/securityNetwork.test.js`）
 - [ ] T010 建立 Sequelize 設定檔與 sequelize-cli 初始化設定，含 development/production 環境區分（`backend/src/config/database.js`、`backend/.sequelizerc`）
 
 ### MySQL Migration 與 Sequelize Model
@@ -67,18 +68,20 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T026a [P] 建立 alertEngine 預期失敗測試：超過 5 分鐘無資料時產生離線告警（`backend/tests/unit/alertEngine.test.js`）
 - [ ] T026b [P] 建立 alertEngine 預期失敗測試：`error_code != 0` 時產生錯誤碼告警（`backend/tests/unit/alertEngine.test.js`）
-- [ ] T026c [P] 建立 alertEngine 預期失敗測試：溫度、壓力、current_a warning/critical 門檻觸發對應設備狀態與 `severity`（`backend/tests/unit/alertEngine.test.js`）
+- [ ] T026c [P] 建立 alertEngine 預期失敗測試：匯入 `backend/src/config/alertThresholds.js` 作為唯一門檻來源，驗證溫度、壓力、current_a warning/critical 邊界觸發對應設備狀態與 `severity`（`backend/tests/unit/alertEngine.test.js`）
 - [ ] T026d [P] 建立 statusUpdater 預期失敗測試：排程重跑不產生重複未解決告警（`backend/tests/unit/statusUpdater.test.js`）
 - [ ] T026e [P] 建立 statusUpdater 預期失敗測試：排程失敗後下一次成功可補偵測遺漏告警（`backend/tests/unit/statusUpdater.test.js`）
-- [ ] T027 建立告警引擎，實作離線、錯誤碼、溫度/壓力/current_a 門檻超限規則，寫入含 `severity` 的 alerts（`backend/src/services/alertEngine.js`）
+- [ ] T027 建立告警門檻設定與告警引擎，從 `alertThresholds.js` 讀取離線、錯誤碼、溫度/壓力/current_a 門檻超限規則，寫入含 `severity` 的 alerts；不得在 alertEngine 內硬編碼與測試不同的門檻（`backend/src/config/alertThresholds.js`、`backend/src/services/alertEngine.js`）
 - [ ] T028 建立 node-cron 排程任務，每 5 分鐘掃描監控期間內設備、呼叫告警引擎、更新 `current_status`/`status_updated_at`、寫入 `status_snapshots`（`backend/src/jobs/statusUpdater.js`）
 - [ ] T029 建立系統健康度路由 `GET /api/v1/system/health`，回傳 MySQL、InfluxDB/Node-RED 狀態與時間戳（`backend/src/api/system.js`）
-- [ ] T029a 建立唯讀告警查詢 API：`GET /api/v1/alerts`，支援 status/site_code/device_id/alert_type/from/to/severity 篩選與分頁（`backend/src/api/alerts.js`）
+- [ ] T029a 建立唯讀告警查詢 API：`GET /api/v1/alerts`，支援 status/site_code/device_id/alert_type/from/to/severity 篩選、分頁與排序；預設 `triggered_at` 新到舊，切換排序不得清除篩選條件（`backend/src/api/alerts.js`）
 
 ### 前端基礎框架
 
 - [ ] T030 建立前端入口，設定 React Router 六頁路由骨架，掛載 React Query Provider 與 RoleContext Provider（`frontend/src/main.tsx`、`frontend/src/App.tsx`）
 - [ ] T031 [P] 建立 `RoleContext`，含 localStorage、角色切換下拉選單、`X-Role` 標頭自動注入（`frontend/src/contexts/RoleContext.tsx`）
+- [ ] T031a [P] 建立前端角色路由預期失敗測試：operator 導覽列不顯示月報/老闆決策頁，直接輸入其路徑顯示繁體中文無權限頁；manager 可進入 6 頁但寫入按鈕維持唯讀/隱藏（`frontend/tests/e2e/route-access.spec.ts`）
+- [ ] T031b 建立角色頁面矩陣與 `RouteGuard`，由 `RoleContext` 控制導覽顯示、路由保護與無權限頁（`frontend/src/contexts/roleAccess.ts`、`frontend/src/components/RouteGuard.tsx`、`frontend/src/App.tsx`）
 - [ ] T032 [P] 建立設計 token，定義設備狀態顏色、字型、間距、焦點樣式（`frontend/src/theme/tokens.ts`）
 - [ ] T033 [P] 建立狀態元件：`StatusDot`、`Badge`、`DataStateBanner`（`frontend/src/components/StatusDot.tsx`、`frontend/src/components/Badge.tsx`、`frontend/src/components/DataStateBanner.tsx`）
 - [ ] T033a [P] 建立共享互動元件庫：`Button`、`IconButton`、`Modal`、`FormField`、`Select`、`Tabs`、`Navigation`、`PageState`，含 aria、鍵盤焦點狀態、loading 狀態與 page data states；使用者動作後 100ms 內必須顯示 loading feedback（`frontend/src/components/`）
@@ -110,11 +113,11 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ## 第四階段：US2 — 風險排序（P2）
 
 - [ ] T043a [P] [US2] 建立後端單元預期失敗測試：operator 建立風險指派並關閉舊 `is_current`；manager 回傳 403（`backend/tests/unit/risks.test.js`）
-- [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試：operator 指派高風險後清單即時更新；30 秒內可識別高風險設備；manager 無指派按鈕（`frontend/tests/e2e/risk-ranking.spec.ts`）
+- [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試：operator 指派高風險後清單即時更新；30 秒內可識別高風險設備；點選設備列/卡開啟風險詳情 Modal 並顯示等級、指派人、時間、備註；manager 無指派按鈕（`frontend/tests/e2e/risk-ranking.spec.ts`）
 - [ ] T043c [US2] 建立 Playwright E2E 預期失敗測試：1 台設備、空群組、第 4 場域篩選皆正確顯示（`frontend/tests/e2e/risk-ranking-edge-cases.spec.ts`）
 - [ ] T043 [US2] 建立風險排序 API：`GET /api/v1/risks`、`POST /api/v1/risks`，支援 site_code 篩選與 operator-only 指派（`backend/src/api/risks.js`）
 - [ ] T044 [US2] 建立 `useRisks` Hook，含風險清單查詢與指派 mutation（`frontend/src/services/useRisks.ts`）
-- [ ] T045 [US2] 建立風險排序頁面，使用共享 Modal/Form/Button，顯示高/中/低分組與指派資訊（`frontend/src/pages/RiskRanking/index.tsx`）
+- [ ] T045 [US2] 建立風險排序頁面，使用共享 Modal/Form/Button，顯示高/中/低分組與指派資訊；點選設備列/卡開啟同頁風險詳情 Modal（`frontend/src/pages/RiskRanking/index.tsx`）
 
 ---
 
@@ -133,24 +136,24 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ## 第六階段：US4 — 告警中心（P4）
 
 - [ ] T051a [P] [US4] 建立後端整合預期失敗測試：operator 可 acknowledge；manager 回傳 403；`severity` 保留（`backend/tests/integration/alerts.test.js`）
-- [ ] T051b [US4] 建立 Playwright E2E 預期失敗測試：operator 確認/解決告警並儲存備註；manager 無操作按鈕（`frontend/tests/e2e/alert-center.spec.ts`）
+- [ ] T051b [US4] 建立 Playwright E2E 預期失敗測試：operator 確認/解決告警並儲存備註；新未處理告警預設置頂；歷史告警可依時間排序且保留篩選條件；manager 無操作按鈕（`frontend/tests/e2e/alert-center.spec.ts`）
 - [ ] T051c [US4] 建立延遲整合預期失敗測試：排程偵測告警後 5 分鐘內可由 `GET /api/v1/alerts` 查到（`backend/tests/integration/alertLatency.test.js`）
 - [ ] T051 [US4] 擴充告警 API：`POST /api/v1/alerts`、`PATCH /api/v1/alerts/:id/acknowledge`、`PATCH /api/v1/alerts/:id/resolve`，operator-only，保存 `severity` 與 resolution_notes（`backend/src/api/alerts.js`）
 - [ ] T052 [US4] 建立 `useAlerts` Hook，含查詢、acknowledge/resolve mutation 與 severity 篩選（`frontend/src/services/useAlerts.ts`）
-- [ ] T053 [US4] 建立告警中心頁面，使用共享 Tabs/Modal/Form/Button，含狀態分頁、篩選器與角色隱藏寫入按鈕（`frontend/src/pages/AlertCenter/index.tsx`）
+- [ ] T053 [US4] 建立告警中心頁面，使用共享 Tabs/Modal/Form/Button，含狀態分頁、篩選器、時間排序控制、預設新到舊排序與角色隱藏寫入按鈕（`frontend/src/pages/AlertCenter/index.tsx`）
 
 ---
 
 ## 第七階段：US5 — 月報雛形（P5）
 
 - [ ] T054a [P] [US5] 建立後端單元預期失敗測試：FR-013 可用率、監控期間分母、無異常文案、不得只讀 `current_status`（`backend/tests/unit/reportService.test.js`）
-- [ ] T054b [US5] 建立 Playwright E2E 預期失敗測試：manager 產生月報、預覽可用率/告警統計、列印按鈕觸發 `window.print()`（`frontend/tests/e2e/monthly-report.spec.ts`）
+- [ ] T054b [US5] 建立 Playwright E2E 預期失敗測試：manager 產生月報、預覽可用率/告警統計、畫面標題與列印頁首含場域名稱/報告月份、列印按鈕觸發 `window.print()`（`frontend/tests/e2e/monthly-report.spec.ts`）
 - [ ] T054c [US5] 建立 Playwright E2E 預期失敗測試：新增第 4 場域後，月報場域選單自動顯示（`frontend/tests/e2e/monthly-report-site-expansion.spec.ts`）
-- [ ] T054 [US5] 建立 ejs 月報模板，含可用率、告警次數、`critical` 告警、類型分布、重大事件、無異常文案、print CSS（`backend/src/templates/monthly-report.ejs`）
+- [ ] T054 [US5] 建立 ejs 月報模板，含 `<title>`、畫面標題與列印頁首的場域名稱/報告月份、可用率、告警次數、`critical` 告警、類型分布、重大事件、無異常文案、print CSS（`backend/src/templates/monthly-report.ejs`）
 - [ ] T055 [US5] 建立月報服務，依 `status_snapshots` 計算可用率，聚合 total/critical 告警，標示設備數量變動並渲染 HTML（`backend/src/services/reportService.js`）
 - [ ] T056 [US5] 建立月報 API：`POST /api/v1/reports/monthly`（manager 報表操作例外，UPSERT 快取）、`GET /api/v1/reports/monthly/:id`、`GET /api/v1/reports/monthly`（`backend/src/api/reports.js`）
 - [ ] T057 [US5] 建立 `useMonthlyReport` Hook，含月報產生 mutation 與查詢（`frontend/src/services/useMonthlyReport.ts`）
-- [ ] T058 [US5] 建立月報頁面，使用共享 Form/Button，含場域/月份選擇、HTML 預覽與 `window.print()`（`frontend/src/pages/MonthlyReport/index.tsx`）
+- [ ] T058 [US5] 建立月報頁面，使用共享 Form/Button，含場域/月份選擇、HTML 預覽、列印前頁面標題檢查與 `window.print()`（`frontend/src/pages/MonthlyReport/index.tsx`）
 
 ---
 
@@ -168,7 +171,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ## 最終階段：完善與跨功能關注點
 
-- [ ] T064 [P] 建立 Nginx 反向代理設定：`/` → React 靜態檔案、`/api` → Node.js Express Port 3001（`nginx.conf`）
+- [ ] T064 [P] 建立 Nginx 反向代理設定：`/` → React 靜態檔案、`/api` → Node.js Express Port 3001；不得代理 MySQL、InfluxDB 或 Node-RED 對外路徑（`nginx.conf`）
+- [ ] T064a 建立部署網路驗證任務：確認 MySQL/InfluxDB 僅允許 EC2-1 存取、Node-RED 僅 localhost 存取、未核准 Origin 被 CORS 拒絕，並將檢查步驟納入驗收流程（`specs/001-heatpump-dashboard-6pages/quickstart.md`）
 - [ ] T065 [P] 補充 Seeder：每台真實設備 5 筆保養紀錄、各場域 10 筆歷史告警，含 severity 與 open/resolved 混合狀態（`backend/db/seeders/002-seed-sample-data.js`）
 - [ ] T066 [P] 驗證邊界情境並修正：全數離線、1 台設備、第四場域、月中新增/移除設備（`frontend/src/pages/DeviceOverview/index.tsx`、`frontend/src/pages/RiskRanking/index.tsx`、`frontend/src/pages/MonthlyReport/index.tsx`、`backend/src/services/reportService.js`）
 - [ ] T067 依 `quickstart.md` 執行完整驗收流程，確認 80 台設備在設備總覽、風險排序、老闆決策頁皆正確呈現（`specs/001-heatpump-dashboard-6pages/quickstart.md`）
@@ -184,7 +188,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ## 依賴與交付順序
 
 - 第一階段無依賴；第二階段依賴第一階段完成，且阻塞 US1-US6。
-- 第二階段中，T010 早於 T011-T022b；T063 早於 T024、T046；T007a 早於 T008。
+- 第二階段中，T010 早於 T011-T022b；T063 早於 T024、T046；T007a 早於 T008；T026c 早於 T027；T031a 早於 T031b。
+- 最終階段中，T064 早於 T064a。
 - US1-US6 建議依 P1 -> P6 交付；基礎建設完成後可多人平行。
 - 每個故事內部順序：預期失敗測試 -> 後端 Service/API -> 前端 Hook -> 頁面 -> 驗收。
 - MVP 範圍：T001-T042，需顯示 80 台設備、降級提示與角色切換。

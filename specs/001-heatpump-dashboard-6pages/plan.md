@@ -89,6 +89,8 @@ v1 必須使用下列核心資料表：
 
 InfluxDB 以 `heatpump_status` 保存 5 分鐘原始讀值，並以 `rp_raw`/`rp_agg` 與連續查詢支援歷史趨勢。`current_a` 與溫度、壓力、功率、`error_code` 同屬 v1 告警與趨勢欄位集合。
 
+告警固定門檻由 `backend/src/config/alertThresholds.js` 統一維護，作為 alertEngine 與對應單元測試的唯一來源。設定檔需以欄位為 key，定義 `warning`/`critical` 的上下限與單位；測試必須匯入此設定檔建立邊界案例，避免測試與實作各自硬編碼不同門檻。
+
 ---
 
 ## API 與角色模型
@@ -102,6 +104,8 @@ v1 角色規則：
 
 所有寫入端點必須明確指定允許角色；缺少 `X-Role` 或角色值無效時一律回傳 HTTP 403，不得預設為 `operator`。
 
+前端需以 `RoleContext` 與 `RouteGuard` 套用同一份角色頁面矩陣。`operator` 導覽列僅顯示設備總覽、風險排序、單機履歷、告警中心；直接輸入月報或老闆決策頁網址時顯示無權限頁。`manager` 可進入 6 頁，但告警、風險、場域與設備主檔操作按鈕維持唯讀或隱藏；API role guard 仍是最終授權邊界。
+
 ---
 
 ## 前端設計約束
@@ -114,6 +118,7 @@ v1 角色規則：
 - `FormField`、`Select`
 - `Tabs`
 - `Navigation`
+- `RouteGuard` 或等效路由保護元件
 - `StatusDot`
 - `Badge`
 - `DataStateBanner`
@@ -129,6 +134,7 @@ v1 角色規則：
 v1 月報採 HTML 預覽與瀏覽器列印：
 - 後端以 ejs 渲染 HTML，儲存至 `monthly_reports.summary_html`。
 - 前端以預覽區顯示 HTML，按鈕呼叫 `window.print()`。
+- 月報 HTML 的 `<title>`、畫面標題與列印頁首必須包含場域名稱與報告月份。
 - 不實作服務端 PDF 生成，不提供 Excel 匯出。
 
 月報可用率必須依 `status_snapshots` 計算，不得只讀 `heat_pumps.current_status`。跨月邊界、月中新增/移除與設備數量變動標示依 [spec.md](./spec.md) FR-013/FR-014 與 [data-model.md](./data-model.md) 規則實作。
@@ -160,6 +166,8 @@ v1 必須落實：
 - Sequelize 使用 parameterized query，避免 SQL Injection。
 - 月報 HTML 由後端模板生成，不接受使用者提供的 HTML。
 - CORS 限定部署 Origin 與 localhost 開發環境。
+
+安全驗證需列入任務：部署設定或 quickstart 必須驗證 MySQL/InfluxDB/Node-RED 不對公網開放；後端整合或安全測試需覆蓋 CORS 白名單、`X-Role` 缺漏/無效拒絕、查詢參數不造成 SQL Injection，並確認月報不接受外部 HTML。
 
 v1 的 `X-Role` 僅是 Demo 層級權限控制；v2 替換為正式 JWT/AuthContext。
 
