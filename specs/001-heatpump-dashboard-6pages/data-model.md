@@ -13,6 +13,7 @@
 ```sql
 CREATE TABLE sites (
   id          INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+  site_code   VARCHAR(20)     NOT NULL COMMENT '場域代碼，如：SITE01',
   name        VARCHAR(100)    NOT NULL COMMENT '場域名稱，如：拉拉手游泳學院',
   address     VARCHAR(255)    NOT NULL DEFAULT '' COMMENT '場域地址',
   contact     VARCHAR(100)    NOT NULL DEFAULT '' COMMENT '聯絡人姓名',
@@ -20,16 +21,20 @@ CREATE TABLE sites (
   is_active   TINYINT(1)      NOT NULL DEFAULT 1 COMMENT '是否啟用（0=停用）',
   created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_site_code (site_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客戶場域主檔';
 ```
 
-**索引**：PRIMARY KEY(id)
+**索引**：PRIMARY KEY(id)、UNIQUE KEY(site_code)
+
+**欄位說明**：
+- `site_code`：系統指派的唯一場域代碼，設備編號與 InfluxDB `site_id` tag 必須使用同一代碼
 
 **種子資料**：
-- 拉拉手游泳學院（3 台真實 + 若干模擬設備）
-- 洗衣廠（若干模擬設備）
-- 罐頭工廠（若干模擬設備）
+- `SITE01`：拉拉手游泳學院（3 台真實 + 若干模擬設備）
+- `SITE02`：洗衣廠（若干模擬設備）
+- `SITE03`：罐頭工廠（若干模擬設備）
 
 ---
 

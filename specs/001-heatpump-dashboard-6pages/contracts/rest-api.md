@@ -66,6 +66,7 @@
   "data": [
     {
       "id": 1,
+      "site_code": "SITE01",
       "name": "拉拉手游泳學院",
       "address": "台北市...",
       "device_count": 3,
@@ -77,6 +78,25 @@
   ]
 }
 ```
+
+### `POST /api/v1/sites`
+
+新增場域主檔。
+
+**角色限制**：僅 `operator` 可呼叫。
+
+**請求 Body**：
+```jsonc
+{
+  "site_code": "SITE04",
+  "name": "新場域",
+  "address": "台中市...",
+  "contact": "王小明",
+  "phone": "0912-000-000"
+}
+```
+
+**回傳**：新增後的 site 物件。
 
 ---
 
@@ -105,6 +125,7 @@
       "name": "泳池熱泵 A",
       "model": "THP-500A",
       "site_id": 1,
+      "site_code": "SITE01",
       "site_name": "拉拉手游泳學院",
       "is_mock": false,
       "current_status": "normal",
@@ -116,11 +137,12 @@
       "data": {
         "temp_outlet":   28.5,
         "pressure_high": 18.2,
+        "current_a":     12.8,
         "power_kw":      12.3,
         "error_code":    0
       },
       "data_quality": {
-        "available_fields": ["temp_outlet", "pressure_high", "power_kw", "error_code"],
+        "available_fields": ["temp_outlet", "pressure_high", "current_a", "power_kw", "error_code"],
         "missing_fields":   [],
         "last_updated_at":  "2026-05-23T09:55:00+08:00"
       }
@@ -129,6 +151,50 @@
   "meta": { "total": 80, "page": 1, "per_page": 20 }
 }
 ```
+
+---
+
+### `POST /api/v1/devices`
+
+新增設備主檔。
+
+**角色限制**：僅 `operator` 可呼叫。
+
+**請求 Body**：
+```jsonc
+{
+  "site_id": 1,
+  "device_id": "SITE01-004",
+  "name": "泳池熱泵 D",
+  "model": "THP-500A",
+  "installed_at": "2026-05-01",
+  "monitoring_started_at": "2026-05-01T00:00:00+08:00",
+  "monitoring_ended_at": null,
+  "is_mock": true
+}
+```
+
+**回傳**：新增後的 device 物件。
+
+---
+
+### `PATCH /api/v1/devices/:device_id`
+
+更新設備主檔與監控期間。
+
+**角色限制**：僅 `operator` 可呼叫。
+
+**請求 Body**：
+```jsonc
+{
+  "name": "泳池熱泵 D",
+  "monitoring_started_at": "2026-05-01T00:00:00+08:00",
+  "monitoring_ended_at": null,
+  "is_active": true
+}
+```
+
+**回傳**：更新後的 device 物件。
 
 ---
 
@@ -148,6 +214,7 @@
     "name": "泳池熱泵 A",
     "model": "THP-500A",
     "site_id": 1,
+    "site_code": "SITE01",
     "site_name": "拉拉手游泳學院",
     "installed_at": "2024-01-15",
     "monitoring_started_at": "2024-01-15T00:00:00+08:00",
@@ -394,9 +461,9 @@
 
 ### `POST /api/v1/reports/monthly`
 
-產生月報（建立或更新）。
+產生月報（建立或更新月報快取）。
 
-**角色限制**：僅 `manager`（高層管理者）可呼叫。
+**角色限制**：僅 `manager`（高層管理者）可呼叫；此端點是 manager 報表操作例外，只能建立或更新 `monthly_reports` 快取，不得修改設備、風險或告警營運資料。
 
 **月報計算規則**：`availability_pct` 必須由 `status_snapshots` 計算，不得以 `heat_pumps.current_status` 回推。若報告月份內設備因 `monitoring_started_at` 或 `monitoring_ended_at` 造成設備數量變動，後端必須在 `summary_html` 中標示「本月設備數量曾變動」，並以各設備實際納入監控期間作為可用率分母。
 
@@ -524,8 +591,11 @@
 | 端點 | `operator`（維運人員） | `manager`（高層管理者） |
 |----------|----------------------|----------------------|
 | `GET /api/v1/sites` | ✅ | ✅ |
+| `POST /api/v1/sites` | ✅ | ❌（403） |
 | `GET /api/v1/devices` | ✅ | ✅ |
+| `POST /api/v1/devices` | ✅ | ❌（403） |
 | `GET /api/v1/devices/:device_id` | ✅ | ✅ |
+| `PATCH /api/v1/devices/:device_id` | ✅ | ❌（403） |
 | `GET /api/v1/devices/:device_id/history` | ✅ | ✅ |
 | `GET /api/v1/risks` | ✅ | ✅ |
 | `POST /api/v1/risks` | ✅ | ❌（403） |
@@ -540,5 +610,7 @@
 
 **v1 角色驗證方式**：前端在每個請求的 HTTP 標頭加入 `X-Role: operator` 或 `X-Role: manager`；
 後端讀取此標頭判斷角色限制。
+
+**manager 寫入例外**：`POST /api/v1/reports/monthly` 僅允許更新報表快取，視為報表產生行為；manager 仍不得建立/修改設備、風險或告警營運資料。
 
 **安全說明**：此機制僅用於 v1 Demo，不視為正式安全控制。v2 需替換為 JWT。
