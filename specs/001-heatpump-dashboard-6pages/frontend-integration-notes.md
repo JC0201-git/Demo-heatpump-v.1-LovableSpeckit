@@ -82,7 +82,7 @@ frontend/src/
 ## 五、需整合的 REST API 端點
 
 **基礎路徑**：`/api/v1`
-**角色認證**：所有請求需攜帶 `X-Role` header（`operator` / `executive`）
+**角色認證**：所有請求需攜帶 `X-Role` header（`operator` / `manager`）
 
 | HTTP 方法 | 端點 | 用途 | 使用頁面 |
 |-----------|------|------|---------|
@@ -92,13 +92,18 @@ frontend/src/
 | GET | `/devices/:device_id/history` | 設備歷史參數趨勢（時序） | 單機履歷 |
 | GET | `/devices/:device_id/maintenance` | 保養紀錄 | 單機履歷 |
 | GET | `/risks` | 風險排序清單 | 風險排序 |
-| PUT | `/risks/:device_id` | 更新風險等級指派 | 風險排序 |
-| GET | `/alerts` | 告警清單（可依場域/設備/狀態篩選） | 告警中心 |
-| PUT | `/alerts/:id/acknowledge` | 確認告警 | 告警中心 |
-| PUT | `/alerts/:id/resolve` | 解決告警（含備註） | 告警中心 |
-| GET | `/reports/monthly` | 月報資料（依場域+月份） | 月報雛形 |
+| POST | `/risks` | 指派或更新風險等級 | 風險排序 |
+| GET | `/alerts` | 告警清單（可依場域/設備/狀態篩選） | 告警中心、單機履歷 |
+| POST | `/alerts` | 手動建立告警 | 告警中心 |
+| PATCH | `/alerts/:id/acknowledge` | 確認告警 | 告警中心 |
+| PATCH | `/alerts/:id/resolve` | 解決告警（含備註） | 告警中心 |
+| GET | `/reports/monthly` | 月報清單 | 月報雛形 |
+| POST | `/reports/monthly` | 產生或重新產生月報 | 月報雛形 |
+| GET | `/reports/monthly/:id` | 取得月報詳情 | 月報雛形 |
 | GET | `/dashboard/summary` | 跨場域彙整指標 | 老闆決策頁 |
 | GET | `/system/health` | 系統健康度（降級偵測） | 全頁面 |
+
+以上端點僅為前端整合摘要；若與 `contracts/openapi.yaml` 衝突，一律以 `contracts/openapi.yaml` 為準。
 
 ---
 
@@ -116,7 +121,7 @@ frontend/src/
 
 ### 前端實作規則
 
-- 角色儲存於 `localStorage`，key 為 `x-role`，值為 `operator`（維運人員）或 `executive`（高層管理者）
+- 角色儲存於 `localStorage`，key 為 `x-role`，值為 `operator`（維運人員）或 `manager`（高層管理者）
 - 所有 API 請求需在 header 加入 `X-Role: <role>`
 - 前端路由守衛：高層管理者若存取寫入操作（如確認告警、指派風險），需顯示「無操作權限」提示
 - `/login` 頁面為角色切換介面（非正式認證，v1 內部使用）

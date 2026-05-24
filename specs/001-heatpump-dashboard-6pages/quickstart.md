@@ -433,13 +433,13 @@ if (data?.degraded) {
 }
 ```
 
-系統健康度輪詢（`/api/v1/system/health`，每 60 秒）：
+系統健康度輪詢（`/api/v1/system/health`，每 10 秒）：
 
 ```typescript
 useQuery({
   queryKey: ['system-health'],
   queryFn: () => fetch('/api/v1/system/health').then(r => r.json()),
-  refetchInterval: 60_000,
+  refetchInterval: 10_000,
   refetchIntervalInBackground: false,
 });
 ```

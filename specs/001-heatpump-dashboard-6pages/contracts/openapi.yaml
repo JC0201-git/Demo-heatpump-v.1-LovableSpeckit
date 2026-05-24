@@ -1271,7 +1271,7 @@ paths:
       summary: 取得後端系統健康度（供前端偵測降級狀態）
       operationId: getSystemHealth
       description: |
-        前端每 60 秒輪詢此端點。若 `status` 為 `degraded` 或 `down`，
+        前端每 10 秒輪詢此端點。若 `status` 為 `degraded` 或 `down`，
         前端應在 10 秒內顯示降級狀態 Banner（SC-006）。
       security: []  # 健康度端點不需角色驗證
       responses:

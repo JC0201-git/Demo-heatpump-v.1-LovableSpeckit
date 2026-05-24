@@ -1,6 +1,6 @@
 # 實作計畫：熱泵儀表板前後端整合
 
-**分支**：`integrate-lovable-frontend` | **日期**：2026-05-24 | **規格**：[spec.md](./spec.md)
+**分支**：`001-heatpump-dashboard-6pages` | **日期**：2026-05-24 | **規格**：[spec.md](./spec.md)
 
 **輸入**：`specs/001-heatpump-dashboard-6pages/spec.md`
 
