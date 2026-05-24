@@ -45,7 +45,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 後端 Express 應用程式
 
 - [ ] T007 建立 Express 應用程式進入點，含 CORS、JSON 解析器、路由掛載骨架、PM2 進程啟動（`backend/src/app.js`）
-- [ ] T008 [P] 建立角色守衛中間件，讀取 `X-Role` 標頭驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403（`backend/src/middleware/roleGuard.js`）
+- [ ] T007a [P] 建立 roleGuard 預期失敗測試：缺少 `X-Role`、角色值無效、角色不符合端點要求時皆回傳 HTTP 403；operator 可執行允許的寫入端點（`backend/tests/unit/roleGuard.test.js`）
+- [ ] T008 [P] 建立角色守衛中間件，讀取 `X-Role` 標頭驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403；缺少 `X-Role` 或角色值無效時必須回傳 HTTP 403，不得預設為 operator（`backend/src/middleware/roleGuard.js`）
 - [ ] T009 [P] 建立全域錯誤處理中間件，依 REST API 契約格式輸出 `{ success: false, error: { code, message } }`（`backend/src/middleware/errorHandler.js`）
 - [ ] T010 建立 Sequelize 設定檔與 sequelize-cli 初始化設定，含 development/production 環境區分（`backend/src/config/database.js`、`backend/.sequelizerc`）
 
@@ -89,6 +90,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 系統健康度 API
 
 - [ ] T029 建立系統健康度路由 `GET /api/v1/system/health`，測試 MySQL 與 InfluxDB（透過 Node-RED）連線狀態，回傳各服務 `status: "up"|"down"` 與時間戳（`backend/src/api/system.js`）
+- [ ] T029a 建立唯讀告警查詢 API：`GET /api/v1/alerts`，支援 status/site_id/heat_pump_id/alert_type/from/to 篩選與分頁，供單機履歷與告警中心共用（`backend/src/api/alerts.js`）
 
 ### 前端基礎框架
 
@@ -121,6 +123,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T037 [US1] 建立場域 API 路由 `GET /api/v1/sites`，回傳所有啟用場域清單與各場域的設備狀態統計（normal/warning/fault/offline 計數）（`backend/src/api/sites.js`）
 - [ ] T038 [US1] 建立裝置服務，整合 MySQL 設備主檔、InfluxDB/Mock 即時資料，回傳含 `data_quality` 與 `degraded` 旗標的完整設備物件（`backend/src/services/deviceService.js`）
 - [ ] T039 [P] [US1] 建立設備 API 路由：`GET /api/v1/devices`（支援 site_id/status 篩選與分頁）、`GET /api/v1/devices/:device_id`（含 current_risk、latest_data、installed_at、monitoring_started_at、monitoring_ended_at）（`backend/src/api/devices.js`）
+- [ ] T039a [US1] 建立場域與設備管理 API：`POST /api/v1/sites`、`POST /api/v1/devices`、`PATCH /api/v1/devices/:device_id`，operator-only；新增場域或設備後既有六頁面不得修改程式碼即可顯示（`backend/src/api/sites.js`、`backend/src/api/devices.js`）
 
 ### 前端實作
 
@@ -141,7 +144,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ### 測試先行（TDD — 先建立預期失敗測試，確認失敗後進入實作）
 
 - [ ] T043a [P] [US2] 建立後端單元預期失敗測試：驗證 `POST /api/v1/risks` 在 `operator` 角色時正確建立指派並將舊紀錄 `is_current` 設為 0；`manager` 角色時回傳 HTTP 403（`backend/tests/unit/risks.test.js`）
-- [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
+- [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；驗證高風險群組位於清單頂部，且以固定種子資料載入後，測試操作者可在 30 秒內透過可見標題與高風險標籤識別至少一台高風險設備；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
 
 ### 後端實作
 
@@ -195,7 +198,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 後端實作
 
-- [ ] T051 [US4] 建立告警 API 路由：`GET /api/v1/alerts`（支援 status/site_id/heat_pump_id/alert_type/from/to 篩選與分頁）、`POST /api/v1/alerts`（operator-only，手動建立）、`PATCH /api/v1/alerts/:id/acknowledge`（operator-only）、`PATCH /api/v1/alerts/:id/resolve`（operator-only，含 resolution_notes 儲存）（`backend/src/api/alerts.js`）
+- [ ] T051 [US4] 擴充告警 API 路由：`POST /api/v1/alerts`（operator-only，手動建立）、`PATCH /api/v1/alerts/:id/acknowledge`（operator-only）、`PATCH /api/v1/alerts/:id/resolve`（operator-only，含 resolution_notes 儲存）（`backend/src/api/alerts.js`）
 
 ### 前端實作
 
@@ -291,7 +294,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 |------|-----------|------|
 | US1（P1） | 無 | 唯一依賴：第二階段基礎建設 |
 | US2（P2） | 無 | `risk_assignments` model 已在第二階段建立 |
-| US3（P3） | 軟依賴 US4 | `useDeviceAlerts` 重用 `/api/v1/alerts`；可先以 hook 直接呼叫，不需等 US4 頁面完成 |
+| US3（P3） | 無 | `GET /api/v1/alerts` 唯讀查詢已在第二階段 T029a 完成；`useDeviceAlerts` 可直接重用此 API |
 | US4（P4） | 無 | `alerts` 資料表與 alertEngine 已在第二階段完成 |
 | US5（P5） | 無 | 月報計算依賴 `alerts` 資料，第二階段已就緒 |
 | US6（P6） | 資料成熟性 | 技術上無依賴；資料越豐富（US1–US4 完成後）展示效果越好 |

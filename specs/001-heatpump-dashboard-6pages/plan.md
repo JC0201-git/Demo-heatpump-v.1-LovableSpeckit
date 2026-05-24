@@ -236,7 +236,7 @@ MySQL CRUD                       InfluxQL 查詢執行
 |----------|------|
 | `GET /influx/latest?device_id=SITE01-001` | 取得設備最新一筆量測資料 |
 | `GET /influx/history?device_id=SITE01-001&field=temp_outlet&from=...&to=...` | 取得歷史時序資料 |
-| `GET /influx/power-meter?device_id=SITE01-001&from=...&to=...` | 取得電錶資料 |
+| `GET /influx/power-meter?device_id=SITE01-001&from=...&to=...` | 取得電錶資料（v2 月報用電量預留，v1 不納入驗收） |
 
 ---
 
@@ -295,8 +295,11 @@ MySQL CRUD                       InfluxQL 查詢執行
 | 方法 | 路徑 | 說明 |
 |------|------|------|
 | GET | `/api/v1/sites` | 場域清單 |
+| POST | `/api/v1/sites` | 新增場域（operator 限定） |
 | GET | `/api/v1/devices` | 設備清單（含狀態/即時資料） |
+| POST | `/api/v1/devices` | 新增設備主檔（operator 限定） |
 | GET | `/api/v1/devices/:device_id` | 設備詳情 |
+| PATCH | `/api/v1/devices/:device_id` | 更新設備主檔與監控期間（operator 限定） |
 | GET | `/api/v1/devices/:device_id/history` | 設備歷史時序（InfluxDB） |
 | GET | `/api/v1/risks` | 風險排序清單 |
 | POST | `/api/v1/risks` | 指派/更新風險等級（operator 限定） |
@@ -318,7 +321,7 @@ MySQL CRUD                       InfluxQL 查詢執行
 |------|-------------|---------|
 | 設備總覽 | `GET /devices`、`GET /sites` | 60 秒自動刷新 |
 | 風險排序 | `GET /risks` | 60 秒自動刷新 |
-| 單機履歷 | `GET /devices/:device_id`、`GET /devices/:device_id/history` | 手動刷新（時序圖） |
+| 單機履歷 | `GET /devices/:device_id`、`GET /devices/:device_id/history`、`GET /alerts?heat_pump_id=...` | 手動刷新（時序圖） |
 | 告警中心 | `GET /alerts`、`PATCH /alerts/:id/acknowledge`、`PATCH /alerts/:id/resolve` | 60 秒自動刷新 |
 | 月報雛形 | `POST /reports/monthly`、`GET /reports/monthly/:id` | 手動觸發 |
 | 老闆決策頁 | `GET /dashboard/summary`、`GET /sites` | 60 秒自動刷新 |
@@ -338,8 +341,9 @@ MySQL CRUD                       InfluxQL 查詢執行
 
 後端 roleGuard 中間件
   ├── 讀取 X-Role 標頭
+  ├── 若標頭缺失或不是 operator/manager → 回傳 403
   ├── 若角色不符合端點要求 → 回傳 403
-  └── 若標頭缺失 → 預設為 operator（v1 行為）
+  └── 所有寫入端點必須明確要求 operator 或 manager，不使用預設角色
 ```
 
 ### v2 預留設計
@@ -438,7 +442,6 @@ POST /api/v1/reports/monthly
   MySQL: alerts（告警統計）
   MySQL: heat_pumps（設備納入監控開始/結束時間，用於月中新增或移除分母）
   MySQL: status_snapshots（依 5 分鐘區間計算可用率的唯一來源）
-  InfluxDB: power_meter（月用電量）
     ↓
 ejs 模板渲染 HTML 字串
     ↓
@@ -458,7 +461,6 @@ ejs 模板渲染 HTML 字串
 - 設備數量 + 設備數量變動註記 + 可用率（%）
 - 告警次數 + 告警類型分布（表格）
 - 重大事件摘要（`critical` 告警清單）
-- 本月用電量（kWh）
 - 無異常時顯示：「本月無異常事件，設備運行正常」
 
 ### 列印 CSS 策略
@@ -602,7 +604,7 @@ influxd backup -portable -database heatpump_db /backup/influxdb/$(date +%Y%m%d)
 9. 風險排序頁面（**P2**）
 10. `GET /devices/:device_id` + `GET /devices/:device_id/history` API（**P3**）
 11. 單機履歷頁面（**P3**）
-12. `GET /alerts` + `PATCH /alerts/:id/acknowledge` + `PATCH /alerts/:id/resolve` API（**P4**）
+12. `POST /alerts` + `PATCH /alerts/:id/acknowledge` + `PATCH /alerts/:id/resolve` API（**P4**；`GET /alerts` 唯讀查詢已在基礎建設完成）
 13. 告警引擎（node-cron 離線/錯誤碼/門檻）（**P4**）
 14. 告警中心頁面（**P4**）
 15. `POST /reports/monthly` + ejs 模板（**P5**）
