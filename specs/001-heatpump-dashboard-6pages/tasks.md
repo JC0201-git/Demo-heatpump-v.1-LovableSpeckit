@@ -46,7 +46,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T007 建立 Express 應用程式進入點，含 CORS、JSON 解析器、路由掛載骨架、PM2 進程啟動（`backend/src/app.js`）
 - [ ] T007a [P] 建立 roleGuard 預期失敗測試：缺少 `X-Role`、角色值無效、角色不符合端點要求時皆回傳 HTTP 403；operator 可執行允許的寫入端點（`backend/tests/unit/roleGuard.test.js`）
-- [ ] T008 [P] 建立角色守衛中間件，讀取 `X-Role` 標頭驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403；缺少 `X-Role` 或角色值無效時必須回傳 HTTP 403，不得預設為 operator（`backend/src/middleware/roleGuard.js`）
+- [ ] T008 建立角色守衛中間件，讀取 `X-Role` 標頭驗證 `operator`/`manager` 存取權限，非授權角色回傳 HTTP 403；缺少 `X-Role` 或角色值無效時必須回傳 HTTP 403，不得預設為 operator（`backend/src/middleware/roleGuard.js`）
 - [ ] T009 [P] 建立全域錯誤處理中間件，依 REST API 契約格式輸出 `{ success: false, error: { code, message } }`（`backend/src/middleware/errorHandler.js`）
 - [ ] T010 建立 Sequelize 設定檔與 sequelize-cli 初始化設定，含 development/production 環境區分（`backend/src/config/database.js`、`backend/.sequelizerc`）
 
@@ -117,13 +117,15 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T037a [P] [US1] 建立後端單元預期失敗測試：驗證 `deviceService.js` 在 `degraded=true` 時回傳最後已知資料與正確 `data_quality` 旗標（`backend/tests/unit/deviceService.test.js`）
 - [ ] T037b [P] [US1] 建立前端單元預期失敗測試：驗證 `useDevices` hook 在 API 回傳 `degraded:true` 時，`isDegraded` 旗標正確傳遞至 UI 狀態（`frontend/tests/unit/useDevices.test.ts`）
 - [ ] T037c [US1] 建立 Playwright E2E 預期失敗測試（US1 主路徑）：登入 → 進入設備總覽 → 驗證顯示 3 個場域、80 台設備狀態卡（並驗證至少 7 台代表設備資料正確）；模擬 health API 回傳 `down` → 驗證降級橫幅顯示（`frontend/tests/e2e/device-overview.spec.ts`）
+- [ ] T037d [P] [US1] 建立後端整合預期失敗測試：operator 可透過 `POST /api/v1/sites` 新增第 4 場域、透過 `POST /api/v1/devices` 新增設備並歸屬該場域、透過 `PATCH /api/v1/devices/:device_id` 更新監控期間；新增後 `GET /api/v1/sites` 與 `GET /api/v1/devices?site_id=...` 必須查得到新資料，manager 與缺少 `X-Role` 的請求必須回傳 HTTP 403（`backend/tests/integration/siteDeviceManagement.test.js`）
+- [ ] T037e [US1] 建立 Playwright E2E 預期失敗測試：以 API 測試資料新增第 4 場域與 1 台設備後，設備總覽、風險排序、月報場域選單與老闆決策頁必須自動顯示新場域，不需修改前端程式碼（`frontend/tests/e2e/site-device-expansion.spec.ts`）
 
 ### 後端實作
 
 - [ ] T037 [US1] 建立場域 API 路由 `GET /api/v1/sites`，回傳所有啟用場域清單與各場域的設備狀態統計（normal/warning/fault/offline 計數）（`backend/src/api/sites.js`）
 - [ ] T038 [US1] 建立裝置服務，整合 MySQL 設備主檔、InfluxDB/Mock 即時資料，回傳含 `data_quality` 與 `degraded` 旗標的完整設備物件（`backend/src/services/deviceService.js`）
 - [ ] T039 [P] [US1] 建立設備 API 路由：`GET /api/v1/devices`（支援 site_id/status 篩選與分頁）、`GET /api/v1/devices/:device_id`（含 current_risk、latest_data、installed_at、monitoring_started_at、monitoring_ended_at）（`backend/src/api/devices.js`）
-- [ ] T039a [US1] 建立場域與設備管理 API：`POST /api/v1/sites`、`POST /api/v1/devices`、`PATCH /api/v1/devices/:device_id`，operator-only；新增場域或設備後既有六頁面不得修改程式碼即可顯示（`backend/src/api/sites.js`、`backend/src/api/devices.js`）
+- [ ] T039a [US1] 建立場域與設備管理 API：`POST /api/v1/sites`、`POST /api/v1/devices`、`PATCH /api/v1/devices/:device_id`，operator-only；必須先完成 T037d/T037e 並確認測試失敗後再實作；新增場域或設備後既有六頁面不得修改程式碼即可顯示（`backend/src/api/sites.js`、`backend/src/api/devices.js`）
 
 ### 前端實作
 
@@ -337,7 +339,7 @@ T039 [P] 建立 devices.js            （T040、T041 完成後）
 
 ### MVP 範圍（建議首次交付）
 
-完成 **T001–T042**（第一至三階段，含 TDD 預期失敗測試 T037a/b/c）即構成可驗收的 MVP：
+完成 **T001–T042**（第一至三階段，含 TDD 預期失敗測試 T037a–T037e）即構成可驗收的 MVP：
 
 - 後端：sites API、devices API、mockDataService、alertEngine（排程運作）
 - 前端：設備總覽頁面顯示 80 台設備狀態、降級提示橫幅、角色切換 UI

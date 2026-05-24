@@ -204,12 +204,12 @@ specs/
 
 | 功能 | 說明 |
 |------|------|
-| REST API | 提供設備、告警、風險、月報、場域的建立、讀取、更新、刪除功能 |
+| REST API | 提供設備、告警、風險、月報、場域所需的建立、讀取、更新功能 |
 | MySQL 存取 | Sequelize ORM |
 | InfluxDB 存取 | 透過 Node-RED HTTP 端點 |
 | 模擬資料 | `mockDataService`：77 台模擬設備即時參數動態生成 |
 | 告警引擎 | `node-cron` 每 5 分鐘掃描；離線/錯誤碼/門檻規則 |
-| 月報產生 | `ejs` 模板渲染 HTML；聚合 MySQL + InfluxDB 資料 |
+| 月報產生 | `ejs` 模板渲染 HTML；v1 聚合 MySQL 資料（告警、設備監控期間、狀態快照）；InfluxDB 用電量資料列為 v2 預留 |
 | 角色驗證 | `roleGuard` 中間件讀取 `X-Role` 標頭 |
 | 系統健康度 | `/api/v1/system/health` 回報 MySQL/InfluxDB/Node-RED 狀態 |
 
