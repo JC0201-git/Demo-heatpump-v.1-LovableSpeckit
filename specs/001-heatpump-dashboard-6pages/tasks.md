@@ -118,7 +118,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T037b [P] [US1] 建立前端單元預期失敗測試：驗證 `useDevices` hook 在 API 回傳 `degraded:true` 時，`isDegraded` 旗標正確傳遞至 UI 狀態（`frontend/tests/unit/useDevices.test.ts`）
 - [ ] T037c [US1] 建立 Playwright E2E 預期失敗測試（US1 主路徑）：登入 → 進入設備總覽 → 驗證顯示 3 個場域、80 台設備狀態卡（並驗證至少 7 台代表設備資料正確）；模擬 health API 回傳 `down` → 驗證降級橫幅顯示（`frontend/tests/e2e/device-overview.spec.ts`）
 - [ ] T037d [P] [US1] 建立後端整合預期失敗測試：operator 可透過 `POST /api/v1/sites` 新增第 4 場域、透過 `POST /api/v1/devices` 新增設備並歸屬該場域、透過 `PATCH /api/v1/devices/:device_id` 更新監控期間；新增後 `GET /api/v1/sites` 與 `GET /api/v1/devices?site_id=...` 必須查得到新資料，manager 與缺少 `X-Role` 的請求必須回傳 HTTP 403（`backend/tests/integration/siteDeviceManagement.test.js`）
-- [ ] T037e [US1] 建立 Playwright E2E 預期失敗測試：以 API 測試資料新增第 4 場域與 1 台設備後，設備總覽、風險排序、月報場域選單與老闆決策頁必須自動顯示新場域，不需修改前端程式碼（`frontend/tests/e2e/site-device-expansion.spec.ts`）
+- [ ] T037e [US1] 建立 Playwright E2E 預期失敗測試：以 API 測試資料新增第 4 場域與 1 台設備後，設備總覽必須自動顯示新場域與該設備，不需修改前端程式碼（`frontend/tests/e2e/device-overview-site-expansion.spec.ts`）
+- [ ] T037f [US1] 建立 Playwright E2E 預期失敗測試（US1 邊界）：當某場域所有設備均離線時，設備總覽須在場域標題顯示「全數離線」，並於每張設備卡顯示最後更新時間（`frontend/tests/e2e/device-overview-edge-cases.spec.ts`）
 
 ### 後端實作
 
@@ -147,6 +148,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T043a [P] [US2] 建立後端單元預期失敗測試：驗證 `POST /api/v1/risks` 在 `operator` 角色時正確建立指派並將舊紀錄 `is_current` 設為 0；`manager` 角色時回傳 HTTP 403（`backend/tests/unit/risks.test.js`）
 - [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試（US2 主路徑）：以 operator 角色進入風險排序 → 開啟指派 Modal → 提交高風險指派 → 驗證清單即時更新；驗證高風險群組位於清單頂部，且以固定種子資料載入後，測試操作者可在 30 秒內透過可見標題與高風險標籤識別至少一台高風險設備；切換 manager 角色 → 驗證指派按鈕不可見（`frontend/tests/e2e/risk-ranking.spec.ts`）
+- [ ] T043c [US2] 建立 Playwright E2E 預期失敗測試（US2 邊界）：當系統中只有 1 台設備在線上時，風險排序仍顯示高／中／低群組；沒有設備的群組顯示「目前無此風險等級設備」；新增第 4 場域後，風險排序場域篩選與清單可自動顯示新場域資料（`frontend/tests/e2e/risk-ranking-edge-cases.spec.ts`）
 
 ### 後端實作
 
@@ -221,6 +223,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T054a [P] [US5] 建立後端單元預期失敗測試：依 spec.md FR-013 定義驗證 `reportService.js` 可用率計算公式（以 `status_snapshots` 計算，不得只讀 `current_status`）；驗證月中新增設備自 `monitoring_started_at` 開始計算分母、月中移除設備計算至 `monitoring_ended_at` 或最後納入監控時間；驗證當月無異常時 HTML 輸出包含「本月無異常事件」字串（`backend/tests/unit/reportService.test.js`）
 - [ ] T054b [US5] 建立 Playwright E2E 預期失敗測試（US5 主路徑）：選擇「拉拉手游泳學院」+ 當前月份 → 觸發產生 → 驗證月報 HTML 預覽顯示含可用率與告警統計；驗證「列印 / 另存 PDF」按鈕觸發 `window.print()`（不驗證服務端 PDF 下載）（`frontend/tests/e2e/monthly-report.spec.ts`）
+- [ ] T054c [US5] 建立 Playwright E2E 預期失敗測試（US5 場域擴充）：以 API 測試資料新增第 4 場域後，月報場域選單必須自動顯示新場域，並可選取該場域產生月報預覽（`frontend/tests/e2e/monthly-report-site-expansion.spec.ts`）
 
 ### 後端實作
 
@@ -247,6 +250,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 - [ ] T059a [P] [US6] 建立後端單元預期失敗測試：驗證 `dashboardService.js` 跨場域統計聚合正確（normal/warning/fault/offline 計數總和 = 80）；驗證環比計算在上月 0 告警時不產生除零錯誤；驗證某場域本月告警數較上月增加至少 30% 且增加至少 3 筆時回傳需關注標記（`backend/tests/unit/dashboardService.test.js`）
 - [ ] T059b [US6] 建立 Playwright E2E 預期失敗測試（US6 主路徑）：以 manager 角色進入老闆決策頁 → 驗證 3 個場域統計卡顯示 → 點選場域名稱 → 驗證跳轉至設備總覽並套用場域篩選（`frontend/tests/e2e/executive-dashboard.spec.ts`）
+- [ ] T059c [US6] 建立 Playwright E2E 預期失敗測試（US6 場域擴充）：以 API 測試資料新增第 4 場域與設備後，老闆決策頁必須自動顯示新場域統計卡，且點選場域名稱可導向設備總覽篩選視圖（`frontend/tests/e2e/executive-dashboard-site-expansion.spec.ts`）
 
 ### 後端實作
 
@@ -310,7 +314,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 
 ### 第二階段內部平行機會
 
-- T008、T009 可與 T007 平行（不同檔案）
+- T009 可與 T007 平行；T008 依賴 T007a 先完成並確認失敗（不同檔案）
 - T011–T016（Migrations）：T010 完成後可全部平行
 - T017–T022（Models）：T010 完成後可全部平行
 - T025、T026 可平行（不同服務檔案）
@@ -323,7 +327,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 ```
 TDD 先行（單人或雙人均先執行）
 ─────────────────────────────────────────────────
-T037a/b/c 建立預期失敗測試（確認失敗後再進入實作）
+T037a–T037f 建立預期失敗測試（確認失敗後再進入實作）
 
 後端開發者                           前端開發者
 ─────────────────────────────────────────────────
@@ -339,7 +343,7 @@ T039 [P] 建立 devices.js            （T040、T041 完成後）
 
 ### MVP 範圍（建議首次交付）
 
-完成 **T001–T042**（第一至三階段，含 TDD 預期失敗測試 T037a–T037e）即構成可驗收的 MVP：
+完成 **T001–T042**（第一至三階段，含 TDD 預期失敗測試 T037a–T037f）即構成可驗收的 MVP：
 
 - 後端：sites API、devices API、mockDataService、alertEngine（排程運作）
 - 前端：設備總覽頁面顯示 80 台設備狀態、降級提示橫幅、角色切換 UI
