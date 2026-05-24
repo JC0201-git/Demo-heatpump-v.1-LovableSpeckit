@@ -73,7 +73,7 @@ node-red/
 
 ## 資料模型與時序資料
 
-MySQL 詳細 DDL、索引、關聯、欄位說明與 InfluxDB retention policy / continuous query 均維護於 [data-model.md](./data-model.md)。
+MySQL 詳細 DDL、索引、關聯、欄位說明與 InfluxDB retention policy / continuous query 由 [data-model.md](./data-model.md) 索引至拆分文件維護。
 
 v1 必須使用下列核心資料表：
 
@@ -93,7 +93,7 @@ InfluxDB 以 `heatpump_status` 保存 5 分鐘原始讀值，並以 `rp_raw`/`rp
 
 ## API 與角色模型
 
-REST API 詳細端點、請求/回應格式與角色限制維護於 [contracts/rest-api.md](./contracts/rest-api.md)。
+REST API 詳細端點、請求/回應格式與角色限制由 [contracts/rest-api.md](./contracts/rest-api.md) 索引至拆分文件維護。對外查詢與請求統一使用 `site_code`；MySQL 內部 FK 才使用 `site_id`。
 
 v1 角色規則：
 - `operator`（維運人員）：可操作設備總覽、風險排序、單機履歷、告警中心；可新增/更新場域與設備主檔、指派風險、建立/確認/解決告警。
@@ -119,6 +119,8 @@ v1 角色規則：
 - `DataStateBanner`
 
 所有互動元件必須支援鍵盤操作、焦點樣式、`aria-label` 或等效語意。6 頁面不得建立與共享元件衝突的 per-page UI 行為。
+
+共享互動元件必須支援 loading 與 page data states；使用者動作後 100ms 內需顯示 loading feedback，並以單元測試或 E2E 驗證。共享元件變更後必須跑 Playwright screenshot/visual regression，覆蓋共享元件展示面與 6 頁主要視圖。
 
 ---
 
@@ -185,7 +187,7 @@ v1 的 `X-Role` 僅是 Demo 層級權限控制；v2 替換為正式 JWT/AuthCont
 
 ### 品質保證
 
-每個使用者故事先建立預期失敗測試，再實作服務/API/頁面。最終驗收需包含 6 頁 E2E、主要 API 效能、設備總覽效能、月報效能、Lighthouse、axe 無障礙掃描與 quickstart 完整流程。
+每個使用者故事先建立預期失敗測試，再實作服務/API/頁面。最終驗收需包含 6 頁 E2E、主要 API 效能、設備總覽效能、月報效能、Lighthouse、axe 無障礙掃描、Playwright screenshot/visual regression 與 quickstart 完整流程。
 
 ---
 

@@ -24,7 +24,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T004 [P] 初始化前端 React + TypeScript 專案，設定 npm `save-exact=true`，以精確版本安裝 @tanstack/react-query、react-router-dom、recharts、dayjs、vitest、@playwright/test（`frontend/package.json`、`frontend/package-lock.json`）
 - [ ] T005 [P] 建立後端環境變數範本，涵蓋 PORT、DB_HOST/PORT/NAME/USER/PASS、INFLUXDB_HOST/PORT/DATABASE、NODERED_BASE_URL、ALERT_CHECK_INTERVAL_MINUTES、DEVICE_OFFLINE_THRESHOLD_MINUTES（`backend/.env.example`）
 - [ ] T006 [P] 設定後端與前端 ESLint + Prettier（`backend/.eslintrc.json`、`backend/.prettierrc`、`frontend/.eslintrc.json`、`frontend/.prettierrc`）
-- [ ] T006b [P] 建立 CI 與品質閘門：lint、unit/integration/E2E coverage >= 80%、精確依賴檢查、6 頁 Lighthouse CI、bundle gzip 增量 <= 10 kB（`.github/workflows/ci.yml`、`.lighthouserc.json`、`scripts/check-exact-deps.mjs`、`frontend/scripts/check-bundle-budget.mjs`、`frontend/bundle-budget.json`）
+- [ ] T006b [P] 建立 CI 與品質閘門：lint、unit/integration/E2E coverage >= 80%、精確依賴檢查、6 頁 Lighthouse CI、Playwright screenshot/visual regression、bundle gzip 增量 <= 10 kB（`.github/workflows/ci.yml`、`.lighthouserc.json`、`scripts/check-exact-deps.mjs`、`frontend/scripts/check-bundle-budget.mjs`、`frontend/bundle-budget.json`）
 
 ---
 
@@ -73,7 +73,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T027 建立告警引擎，實作離線、錯誤碼、溫度/壓力/current_a 門檻超限規則，寫入含 `severity` 的 alerts（`backend/src/services/alertEngine.js`）
 - [ ] T028 建立 node-cron 排程任務，每 5 分鐘掃描監控期間內設備、呼叫告警引擎、更新 `current_status`/`status_updated_at`、寫入 `status_snapshots`（`backend/src/jobs/statusUpdater.js`）
 - [ ] T029 建立系統健康度路由 `GET /api/v1/system/health`，回傳 MySQL、InfluxDB/Node-RED 狀態與時間戳（`backend/src/api/system.js`）
-- [ ] T029a 建立唯讀告警查詢 API：`GET /api/v1/alerts`，支援 status/site_id/heat_pump_id/alert_type/from/to/severity 篩選與分頁（`backend/src/api/alerts.js`）
+- [ ] T029a 建立唯讀告警查詢 API：`GET /api/v1/alerts`，支援 status/site_code/device_id/alert_type/from/to/severity 篩選與分頁（`backend/src/api/alerts.js`）
 
 ### 前端基礎框架
 
@@ -81,7 +81,8 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T031 [P] 建立 `RoleContext`，含 localStorage、角色切換下拉選單、`X-Role` 標頭自動注入（`frontend/src/contexts/RoleContext.tsx`）
 - [ ] T032 [P] 建立設計 token，定義設備狀態顏色、字型、間距、焦點樣式（`frontend/src/theme/tokens.ts`）
 - [ ] T033 [P] 建立狀態元件：`StatusDot`、`Badge`、`DataStateBanner`（`frontend/src/components/StatusDot.tsx`、`frontend/src/components/Badge.tsx`、`frontend/src/components/DataStateBanner.tsx`）
-- [ ] T033a [P] 建立共享互動元件庫：`Button`、`IconButton`、`Modal`、`FormField`、`Select`、`Tabs`、`Navigation`，含 aria 與鍵盤焦點狀態（`frontend/src/components/`）
+- [ ] T033a [P] 建立共享互動元件庫：`Button`、`IconButton`、`Modal`、`FormField`、`Select`、`Tabs`、`Navigation`、`PageState`，含 aria、鍵盤焦點狀態、loading 狀態與 page data states；使用者動作後 100ms 內必須顯示 loading feedback（`frontend/src/components/`）
+- [ ] T033b [P] 建立共享元件預期失敗測試：驗證 Button/Form/PageState loading 狀態、disabled 防重送、aria-busy、100ms 內 loading feedback（`frontend/tests/unit/shared-components.test.tsx`）
 - [ ] T034 [P] 建立工具函數：缺欄位回退顯示、dayjs 日期格式化、ISO 8601 時間解析（`frontend/src/utils/format.ts`）
 - [ ] T035 建立 API 請求基礎函數，自動附加 `X-Role`、解析 `{ success, data, degraded }`、統一錯誤拋出（`frontend/src/services/api.ts`）
 - [ ] T036 [P] 建立系統健康度 Hook，每 10 秒輪詢 health；API 回傳 `degraded:true` 或請求失敗時更新 `isDegraded`（`frontend/src/services/useSystemHealth.ts`）
@@ -98,7 +99,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T037f [US1] 建立 Playwright E2E 預期失敗測試：某場域全數離線時標示「全數離線」與最後更新時間（`frontend/tests/e2e/device-overview-edge-cases.spec.ts`）
 - [ ] T037 [US1] 建立場域 API：`GET /api/v1/sites`，回傳啟用場域與狀態統計；`site_code` 必須出現在回應（`backend/src/api/sites.js`）
 - [ ] T038 [US1] 建立裝置服務，整合 MySQL、InfluxDB/Mock 即時資料，回傳含 `status_updated_at`、`data_quality`、`degraded` 的設備物件（`backend/src/services/deviceService.js`）
-- [ ] T039 [P] [US1] 建立設備 API：`GET /api/v1/devices`、`GET /api/v1/devices/:device_id`，支援 site_id/status 篩選與分頁（`backend/src/api/devices.js`）
+- [ ] T039 [P] [US1] 建立設備 API：`GET /api/v1/devices`、`GET /api/v1/devices/:device_id`，支援 site_code/status 篩選與分頁（`backend/src/api/devices.js`）
 - [ ] T039a [US1] 建立場域與設備管理 API：`POST /api/v1/sites`、`POST /api/v1/devices`、`PATCH /api/v1/devices/:device_id`，operator-only（`backend/src/api/sites.js`、`backend/src/api/devices.js`）
 - [ ] T040 [US1] 建立 `useSites` Hook，60 秒刷新並整合降級旗標（`frontend/src/services/useSites.ts`）
 - [ ] T041 [P] [US1] 建立 `useDevices` Hook，支援篩選參數與 60 秒刷新（`frontend/src/services/useDevices.ts`）
@@ -111,7 +112,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T043a [P] [US2] 建立後端單元預期失敗測試：operator 建立風險指派並關閉舊 `is_current`；manager 回傳 403（`backend/tests/unit/risks.test.js`）
 - [ ] T043b [US2] 建立 Playwright E2E 預期失敗測試：operator 指派高風險後清單即時更新；30 秒內可識別高風險設備；manager 無指派按鈕（`frontend/tests/e2e/risk-ranking.spec.ts`）
 - [ ] T043c [US2] 建立 Playwright E2E 預期失敗測試：1 台設備、空群組、第 4 場域篩選皆正確顯示（`frontend/tests/e2e/risk-ranking-edge-cases.spec.ts`）
-- [ ] T043 [US2] 建立風險排序 API：`GET /api/v1/risks`、`POST /api/v1/risks`，支援 site_id 篩選與 operator-only 指派（`backend/src/api/risks.js`）
+- [ ] T043 [US2] 建立風險排序 API：`GET /api/v1/risks`、`POST /api/v1/risks`，支援 site_code 篩選與 operator-only 指派（`backend/src/api/risks.js`）
 - [ ] T044 [US2] 建立 `useRisks` Hook，含風險清單查詢與指派 mutation（`frontend/src/services/useRisks.ts`）
 - [ ] T045 [US2] 建立風險排序頁面，使用共享 Modal/Form/Button，顯示高/中/低分組與指派資訊（`frontend/src/pages/RiskRanking/index.tsx`）
 
@@ -176,6 +177,7 @@ description: "熱泵設備監控儀表板 — 可執行任務清單"
 - [ ] T070 [P] 建立 API 效能測試：主要 API P95 <= 500ms 並整合 CI gate（`backend/tests/performance/api-p95.test.js`）
 - [ ] T071 [P] 補全共用元件無障礙功能，所有互動元件加入 aria、role、鍵盤焦點樣式（`frontend/src/components/`）
 - [ ] T072 [P] 建立 Playwright + axe 無障礙測試，掃描 6 頁主要流程且無嚴重 WCAG 2.1 AA 違規（`frontend/tests/e2e/accessibility.spec.ts`）
+- [ ] T073 [P] 建立 Playwright screenshot/visual regression 測試，覆蓋共享元件展示面與 6 頁主要視圖；共享元件變更時此測試必須在 CI 執行（`frontend/tests/e2e/visual-regression.spec.ts`、`frontend/tests/e2e/shared-components-visual.spec.ts`）
 
 ---
 
