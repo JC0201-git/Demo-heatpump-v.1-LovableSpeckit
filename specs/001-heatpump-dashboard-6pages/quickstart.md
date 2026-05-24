@@ -343,3 +343,111 @@ sudo apt-get install -y nginx
 
 5. **月報列印**：月報頁面的「匯出 PDF」按鈕呼叫 `window.print()`，
    確保 `@media print` CSS 樣式正確設定（隱藏導覽列、設定頁面邊距）。
+
+---
+
+## 十、前後端整合：設定說明
+
+### 10.1 前端環境變數（`frontend/.env.local`）
+
+```dotenv
+# 後端 API 基礎路徑（本機開發）
+VITE_API_BASE_URL=http://localhost:3001/api/v1
+
+# 預設角色（operator 或 manager）
+VITE_DEFAULT_ROLE=operator
+```
+
+正式部署時（Cloudflare Workers），`VITE_API_BASE_URL` 改為後端的正式域名。
+
+### 10.2 前端 API 客戶端設定（`frontend/src/lib/api/client.ts`）
+
+前端的 API 客戶端需自動注入 `X-Role` header：
+
+```typescript
+// frontend/src/lib/api/client.ts
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  role: 'operator' | 'manager'
+): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Role': role,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+```
+
+### 10.3 型別對齊（Mock → API）
+
+整合前需完成以下型別對齊（詳見 `frontend-integration-notes.md` 第四節）：
+
+| 現有 Mock 型別 | 對齊後 API 型別 | 修改說明 |
+|---------------|----------------|---------|
+| `DeviceStatus: "abnormal"` | `DeviceStatus: "fault"` | `abnormal` 改為 `fault` |
+| `DeviceStatus: "maintenance"` | 移除 | 規格未定義此狀態 |
+| 新增 `"warning"` | `DeviceStatus: "warning"` | 原 Mock 缺少此狀態 |
+| `riskScore: number (0–100)` | `risk_level: "high" \| "medium" \| "low"` | 數值評分改為等級字串 |
+| `isRealApi: boolean` | `is_mock: boolean` | 語意相反；整合時統一使用 `is_mock` |
+| `AlertStatus: "in_progress"` | `AlertStatus: "acknowledged"` | 對齊後端告警生命週期 |
+| `rankChange: "up" \| "down" \| "flat"` | 移除 | v1 後端不提供；前端移除此欄位 |
+
+### 10.4 CORS 設定（後端）
+
+本機開發時，後端需允許前端開發伺服器的 CORS 請求：
+
+```typescript
+// backend/src/app.ts
+import cors from 'cors';
+
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://your-production-domain.com']
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'X-Role'],
+}));
+```
+
+### 10.5 降級狀態處理（前端）
+
+當後端回應包含 `degraded: true` 時，前端應在頁面頂端顯示降級 Banner：
+
+```typescript
+// 每個 TanStack Query hook 取得資料後檢查
+if (data?.degraded) {
+  // 顯示共用 DegradedBanner 元件
+  // 顯示 data.last_good_data_at 時間戳記
+  // 繼續顯示 data.data 中的最後已知資料
+}
+```
+
+系統健康度輪詢（`/api/v1/system/health`，每 60 秒）：
+
+```typescript
+useQuery({
+  queryKey: ['system-health'],
+  queryFn: () => fetch('/api/v1/system/health').then(r => r.json()),
+  refetchInterval: 60_000,
+  refetchIntervalInBackground: false,
+});
+```
+
+### 10.6 API 契約唯一來源
+
+**所有 API 端點定義以 `specs/001-heatpump-dashboard-6pages/contracts/openapi.yaml` 為準。**
+
+- 後端路由必須完全符合 openapi.yaml 中的 operationId、參數名稱與回應 schema
+- 前端型別定義（`frontend/src/lib/api/types.ts`）必須由 openapi.yaml 的 schemas 生成或手動對齊
+- `rest-api.md` 僅供人類閱讀參考，有衝突時以 openapi.yaml 為準

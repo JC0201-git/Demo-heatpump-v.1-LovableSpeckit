@@ -1,0 +1,1333 @@
+openapi: 3.0.3
+info:
+  title: 熱泵設備監控儀表板 REST API
+  description: |
+    熱泵設備監控儀表板後端 API。
+    前端透過此 API 取得設備狀態、告警、風險排序、月報等資料。
+    前端不直接連接 MySQL 或 InfluxDB；所有資料查詢、清洗與權限控制均由後端負責。
+
+    **角色驗證（v1）**：每個請求需在 HTTP Header 攜帶 `X-Role: operator` 或 `X-Role: manager`。
+    此機制僅供 Demo 使用，不視為正式安全控制。v2 將替換為 JWT。
+  version: 1.0.0
+  contact:
+    name: 熱泵儀表板開發團隊
+
+servers:
+  - url: /api/v1
+    description: 後端 API 基礎路徑
+
+tags:
+  - name: 場域
+    description: 客戶場域管理
+  - name: 設備
+    description: 熱泵設備查詢與歷史資料
+  - name: 風險排序
+    description: 設備風險等級指派與排序
+  - name: 告警
+    description: 告警生命週期管理
+  - name: 月報
+    description: 設備運行月報產生與查詢
+  - name: 決策頁
+    description: 跨場域彙整指標（老闆決策頁）
+  - name: 系統
+    description: 後端系統健康度
+
+# ─────────────────────────────────────────────
+# 通用安全方案（v1 角色 Header）
+# ─────────────────────────────────────────────
+security:
+  - RoleHeader: []
+
+components:
+  securitySchemes:
+    RoleHeader:
+      type: apiKey
+      in: header
+      name: X-Role
+      description: |
+        角色標識 Header，值為 `operator`（維運人員）或 `manager`（高層管理者）。
+        v1 Demo 機制，不具備正式安全性。
+
+  schemas:
+    # ── 通用回傳格式 ──────────────────────────
+    SuccessEnvelope:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+        degraded:
+          type: boolean
+          description: 資料源降級時為 true（InfluxDB/Node-RED 不可用）
+          example: false
+        degraded_reason:
+          type: string
+          description: 降級原因說明
+          example: "InfluxDB 連線逾時"
+        last_good_data_at:
+          type: string
+          format: date-time
+          description: 最後一次成功取得資料的時間（降級時提供）
+          example: "2026-05-23T09:55:00+08:00"
+
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: "DEVICE_NOT_FOUND"
+            message:
+              type: string
+              example: "找不到指定設備"
+            details:
+              nullable: true
+              description: 可選除錯資訊
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 80
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+
+    # ── 場域 ────────────────────────────────────
+    Site:
+      type: object
+      required: [id, name, address, device_count, normal_count, warning_count, fault_count, offline_count]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "拉拉手游泳學院"
+        address:
+          type: string
+          example: "台中市..."
+        device_count:
+          type: integer
+          example: 3
+        normal_count:
+          type: integer
+          example: 2
+        warning_count:
+          type: integer
+          example: 1
+        fault_count:
+          type: integer
+          example: 0
+        offline_count:
+          type: integer
+          example: 0
+
+    # ── 設備狀態 ────────────────────────────────
+    DeviceStatus:
+      type: string
+      enum: [normal, warning, fault, offline]
+      description: |
+        - `normal`：所有參數均在設定範圍內
+        - `warning`：任一參數超出警戒值（未達危急值）
+        - `fault`：任一參數超出危急值，或告警引擎觸發
+        - `offline`：超過 5 分鐘未收到資料
+
+    RiskLevel:
+      type: string
+      enum: [high, medium, low]
+      description: 設備風險等級（維運人員手動指派）
+
+    # ── 設備資料品質 ────────────────────────────
+    DataQuality:
+      type: object
+      properties:
+        available_fields:
+          type: array
+          items:
+            type: string
+          example: ["temp_outlet", "pressure_high", "power_kw", "error_code"]
+        missing_fields:
+          type: array
+          items:
+            type: string
+          example: []
+        last_updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T09:55:00+08:00"
+
+    # ── 設備摘要（列表用）────────────────────────
+    DeviceSummary:
+      type: object
+      required: [id, device_id, name, site_id, site_name, current_status, status_updated_at, installed_at, is_mock]
+      properties:
+        id:
+          type: integer
+          example: 1
+        device_id:
+          type: string
+          example: "SITE01-001"
+          description: 設備識別碼（格式：場域代碼-流水號）
+        name:
+          type: string
+          example: "泳池熱泵 A"
+        model:
+          type: string
+          example: "THP-500A"
+        site_id:
+          type: integer
+          example: 1
+        site_name:
+          type: string
+          example: "拉拉手游泳學院"
+        is_mock:
+          type: boolean
+          example: false
+          description: 是否為模擬設備（false = 真實設備）
+        current_status:
+          $ref: '#/components/schemas/DeviceStatus'
+        status_updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T10:00:00+08:00"
+        installed_at:
+          type: string
+          format: date
+          example: "2024-01-15"
+        monitoring_started_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T00:00:00+08:00"
+        monitoring_ended_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+          nullable: true
+        data:
+          type: object
+          description: 最新感測器讀值（可依設備型號不同而有差異）
+          properties:
+            temp_outlet:
+              type: number
+              format: float
+              example: 28.5
+            pressure_high:
+              type: number
+              format: float
+              example: 18.2
+            power_kw:
+              type: number
+              format: float
+              example: 12.3
+            error_code:
+              type: integer
+              example: 0
+        data_quality:
+          $ref: '#/components/schemas/DataQuality'
+
+    # ── 設備詳情（單機用）────────────────────────
+    DeviceDetail:
+      allOf:
+        - $ref: '#/components/schemas/DeviceSummary'
+        - type: object
+          properties:
+            notes:
+              type: string
+              nullable: true
+              example: ""
+            current_risk:
+              type: object
+              nullable: true
+              properties:
+                risk_level:
+                  $ref: '#/components/schemas/RiskLevel'
+                assigned_by:
+                  type: string
+                  example: "維運人員"
+                assigned_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-20T09:00:00+08:00"
+                notes:
+                  type: string
+                  nullable: true
+                  example: "近期運作穩定"
+            latest_data:
+              type: object
+              description: 完整最新感測器讀值
+              properties:
+                temp_inlet:
+                  type: number
+                  format: float
+                  example: 22.1
+                temp_outlet:
+                  type: number
+                  format: float
+                  example: 28.5
+                pressure_high:
+                  type: number
+                  format: float
+                  example: 18.2
+                pressure_low:
+                  type: number
+                  format: float
+                  example: 5.4
+                current_a:
+                  type: number
+                  format: float
+                  example: 12.8
+                voltage_a:
+                  type: number
+                  format: float
+                  example: 220.0
+                power_kw:
+                  type: number
+                  format: float
+                  example: 12.3
+                error_code:
+                  type: integer
+                  example: 0
+                last_updated_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-23T09:55:00+08:00"
+
+    # ── 歷史時序資料點 ──────────────────────────
+    TimeSeriesPoint:
+      type: object
+      required: [time, value]
+      properties:
+        time:
+          type: string
+          format: date-time
+          example: "2026-05-23T08:00:00+08:00"
+        value:
+          type: number
+          format: float
+          nullable: true
+          example: 27.8
+
+    # ── 風險指派 ──────────────────────────────
+    RiskItem:
+      type: object
+      required: [heat_pump_id, device_id, name, site_name, current_status, risk_level, open_alert_count]
+      properties:
+        heat_pump_id:
+          type: integer
+          example: 1
+        device_id:
+          type: string
+          example: "SITE01-001"
+        name:
+          type: string
+          example: "泳池熱泵 A"
+        site_name:
+          type: string
+          example: "拉拉手游泳學院"
+        current_status:
+          $ref: '#/components/schemas/DeviceStatus'
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        assigned_by:
+          type: string
+          nullable: true
+          example: "維運人員"
+        assigned_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-05-22T14:00:00+08:00"
+        notes:
+          type: string
+          nullable: true
+          example: "壓力偏高，需優先檢查"
+        open_alert_count:
+          type: integer
+          example: 2
+
+    # ── 告警 ─────────────────────────────────
+    AlertStatus:
+      type: string
+      enum: [open, acknowledged, resolved]
+
+    AlertType:
+      type: string
+      enum: [offline, error_code, threshold, manual]
+      description: |
+        - `offline`：超過 5 分鐘無資料（後端自動觸發）
+        - `error_code`：設備回傳非零錯誤碼（後端自動觸發）
+        - `threshold`：固定門檻超限（後端自動觸發）
+        - `manual`：維運人員手動建立
+
+    AlertSeverity:
+      type: string
+      enum: [critical, warning, info]
+
+    Alert:
+      type: object
+      required: [id, heat_pump_id, device_name, site_name, alert_type, severity, title, triggered_at, status]
+      properties:
+        id:
+          type: integer
+          example: 10
+        heat_pump_id:
+          type: integer
+          example: 1
+        device_name:
+          type: string
+          example: "泳池熱泵 A"
+        site_name:
+          type: string
+          example: "拉拉手游泳學院"
+        alert_type:
+          $ref: '#/components/schemas/AlertType'
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        title:
+          type: string
+          example: "出水溫度超限"
+        description:
+          type: string
+          nullable: true
+          example: "出水溫度 35.2°C 超過警戒值 33°C"
+        error_code:
+          type: string
+          nullable: true
+          example: null
+        triggered_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T09:30:00+08:00"
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        acknowledged_by:
+          type: string
+          nullable: true
+          example: null
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        resolved_by:
+          type: string
+          nullable: true
+          example: null
+        resolution_notes:
+          type: string
+          nullable: true
+          example: null
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+
+    # ── 月報 ─────────────────────────────────
+    MonthlyReport:
+      type: object
+      required: [id, site_id, site_name, report_year, report_month, generated_at, total_devices, availability_pct, total_alerts, status]
+      properties:
+        id:
+          type: integer
+          example: 3
+        site_id:
+          type: integer
+          example: 1
+        site_name:
+          type: string
+          example: "拉拉手游泳學院"
+        report_year:
+          type: integer
+          example: 2026
+        report_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          example: 4
+        generated_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T10:05:00+08:00"
+        total_devices:
+          type: integer
+          example: 3
+        availability_pct:
+          type: number
+          format: float
+          description: |
+            設備可用率（%），精確至小數點後一位。
+            計算公式：(月內 status ∉ {fault, offline} 的 5 分鐘區間數) ÷ 月內總 5 分鐘區間數 × 100
+            資料來源：status_snapshots 表，不得以 current_status 回推。
+          example: 98.5
+        total_alerts:
+          type: integer
+          example: 2
+        critical_alerts:
+          type: integer
+          example: 0
+        total_kwh:
+          type: number
+          format: float
+          nullable: true
+          example: 1234.56
+        summary_html:
+          type: string
+          description: 月報 HTML 字串（供前端 iframe 或 window.print() 使用）
+          example: "<html>...</html>"
+        status:
+          type: string
+          enum: [draft, final]
+          example: "draft"
+
+    # ── 老闆決策頁彙整 ────────────────────────
+    DashboardSummary:
+      type: object
+      required: [generated_at, overall, sites]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T10:00:00+08:00"
+        overall:
+          type: object
+          required: [total_sites, total_devices, normal_count, warning_count, fault_count, offline_count, open_alerts, this_month_alerts, last_month_alerts]
+          properties:
+            total_sites:
+              type: integer
+              example: 3
+            total_devices:
+              type: integer
+              example: 80
+            normal_count:
+              type: integer
+              example: 72
+            warning_count:
+              type: integer
+              example: 5
+            fault_count:
+              type: integer
+              example: 1
+            offline_count:
+              type: integer
+              example: 2
+            open_alerts:
+              type: integer
+              example: 8
+            this_month_alerts:
+              type: integer
+              example: 15
+            last_month_alerts:
+              type: integer
+              example: 11
+        sites:
+          type: array
+          items:
+            type: object
+            required: [site_id, site_name, device_count, normal_count, warning_count, fault_count, offline_count, this_month_alerts, last_month_alerts]
+            properties:
+              site_id:
+                type: integer
+                example: 1
+              site_name:
+                type: string
+                example: "拉拉手游泳學院"
+              device_count:
+                type: integer
+                example: 3
+              normal_count:
+                type: integer
+                example: 2
+              warning_count:
+                type: integer
+                example: 1
+              fault_count:
+                type: integer
+                example: 0
+              offline_count:
+                type: integer
+                example: 0
+              this_month_alerts:
+                type: integer
+                example: 3
+              last_month_alerts:
+                type: integer
+                example: 1
+              alert_spike:
+                type: boolean
+                description: |
+                  本月告警數相較上月增加至少 30% 且增加筆數至少 3 筆時為 true（需突顯標示）
+                example: false
+
+    # ── 系統健康度 ────────────────────────────
+    SystemHealth:
+      type: object
+      required: [status, services, checked_at]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, down]
+          example: "healthy"
+        services:
+          type: object
+          properties:
+            mysql:
+              $ref: '#/components/schemas/ServiceStatus'
+            influxdb:
+              $ref: '#/components/schemas/ServiceStatus'
+            nodered:
+              $ref: '#/components/schemas/ServiceStatus'
+        checked_at:
+          type: string
+          format: date-time
+          example: "2026-05-23T10:00:00+08:00"
+
+    ServiceStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [up, down, degraded]
+          example: "up"
+        latency_ms:
+          type: integer
+          example: 5
+
+  # ── 通用回應參數 ──────────────────────────
+  parameters:
+    SiteIdQuery:
+      name: site_id
+      in: query
+      schema:
+        type: integer
+      description: 依場域 ID 篩選
+    PageQuery:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+      description: 頁碼（從 1 開始）
+    PerPageQuery:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+      description: 每頁筆數（最大 100）
+    DeviceIdPath:
+      name: device_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 設備識別碼（如 `SITE01-001`）
+
+# ─────────────────────────────────────────────
+# 端點定義
+# ─────────────────────────────────────────────
+paths:
+
+  # ── 場域 ────────────────────────────────────
+  /sites:
+    get:
+      tags: [場域]
+      summary: 取得所有啟用場域清單
+      operationId: listSites
+      responses:
+        '200':
+          description: 場域清單（含各場域設備狀態統計）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Site'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ── 設備 ────────────────────────────────────
+  /devices:
+    get:
+      tags: [設備]
+      summary: 取得設備清單（含即時狀態，可依場域/狀態篩選）
+      operationId: listDevices
+      parameters:
+        - $ref: '#/components/parameters/SiteIdQuery'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DeviceStatus'
+          description: 依設備狀態篩選
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: 設備清單（含分頁 meta）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeviceSummary'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /devices/{device_id}:
+    get:
+      tags: [設備]
+      summary: 取得單一設備詳情（含完整感測器讀值與風險資訊）
+      operationId: getDevice
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+      responses:
+        '200':
+          description: 設備詳情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeviceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /devices/{device_id}/history:
+    get:
+      tags: [設備]
+      summary: 取得設備歷史時序資料（用於單機履歷圖表）
+      operationId: getDeviceHistory
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+        - name: field
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [temp_inlet, temp_outlet, pressure_high, pressure_low, current_a, voltage_a, power_kw, error_code]
+          description: 查詢的感測器欄位名稱
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: 起始時間（ISO 8601）
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: 結束時間（ISO 8601）
+        - name: resolution
+          in: query
+          schema:
+            type: string
+            enum: ['5m', '1h', '1d']
+          description: |
+            資料解析度（預設依時間範圍自動選擇）：
+            - ≤ 1 天 → `5m`（原始資料）
+            - ≤ 7 天 → `1h`（小時彙總）
+            - > 7 天 → `1d`（日彙總）
+      responses:
+        '200':
+          description: 時序資料點陣列
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          device_id:
+                            type: string
+                            example: "SITE01-001"
+                          field:
+                            type: string
+                            example: "temp_outlet"
+                          resolution:
+                            type: string
+                            example: "1h"
+                          points:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/TimeSeriesPoint'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /devices/{device_id}/maintenance:
+    get:
+      tags: [設備]
+      summary: 取得設備保養紀錄（用於單機履歷）
+      operationId: getDeviceMaintenance
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: 保養紀錄清單
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            maintained_at:
+                              type: string
+                              format: date
+                            technician:
+                              type: string
+                            description:
+                              type: string
+                            next_maintenance_at:
+                              type: string
+                              format: date
+                              nullable: true
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── 風險排序 ─────────────────────────────────
+  /risks:
+    get:
+      tags: [風險排序]
+      summary: 取得所有設備風險排序清單（依風險等級降序，同等級依最後告警時間排序）
+      operationId: listRisks
+      parameters:
+        - $ref: '#/components/parameters/SiteIdQuery'
+      responses:
+        '200':
+          description: 風險排序清單
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RiskItem'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      tags: [風險排序]
+      summary: 指派或更新設備風險等級
+      operationId: assignRisk
+      description: |
+        **角色限制**：僅 `operator`（維運人員）可呼叫。
+        `manager` 呼叫時回傳 403。
+        指派時，後端會將該設備原有的 `is_current = 1` 記錄設為 0，並建立新記錄。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [heat_pump_id, risk_level, assigned_by]
+              properties:
+                heat_pump_id:
+                  type: integer
+                  example: 1
+                risk_level:
+                  $ref: '#/components/schemas/RiskLevel'
+                notes:
+                  type: string
+                  nullable: true
+                  example: "壓力偏高，需優先檢查"
+                assigned_by:
+                  type: string
+                  description: v1 直接傳角色名稱，v2 替換為 user_id
+                  example: "維運人員"
+      responses:
+        '201':
+          description: 風險指派成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          heat_pump_id:
+                            type: integer
+                          risk_level:
+                            $ref: '#/components/schemas/RiskLevel'
+                          assigned_by:
+                            type: string
+                          assigned_at:
+                            type: string
+                            format: date-time
+                          notes:
+                            type: string
+                            nullable: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ── 告警 ─────────────────────────────────────
+  /alerts:
+    get:
+      tags: [告警]
+      summary: 取得告警清單（支援多條件篩選）
+      operationId: listAlerts
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            description: 多值逗號分隔，如 `open,acknowledged`
+          example: "open,acknowledged"
+        - $ref: '#/components/parameters/SiteIdQuery'
+        - name: heat_pump_id
+          in: query
+          schema:
+            type: integer
+          description: 依設備 ID 篩選
+        - name: alert_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/AlertType'
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: 篩選觸發時間起始（ISO 8601）
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: 篩選觸發時間結束（ISO 8601）
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: 告警清單（含分頁）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Alert'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      tags: [告警]
+      summary: 手動建立告警
+      operationId: createAlert
+      description: |
+        **角色限制**：僅 `operator`（維運人員）可呼叫。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [heat_pump_id, alert_type, severity, title, triggered_at]
+              properties:
+                heat_pump_id:
+                  type: integer
+                  example: 1
+                alert_type:
+                  type: string
+                  enum: [manual]
+                severity:
+                  $ref: '#/components/schemas/AlertSeverity'
+                title:
+                  type: string
+                  example: "現場發現異常噪音"
+                description:
+                  type: string
+                  nullable: true
+                  example: "技師現場巡檢時發現壓縮機有異常噪音"
+                triggered_at:
+                  type: string
+                  format: date-time
+                  example: "2026-05-23T10:00:00+08:00"
+      responses:
+        '201':
+          description: 告警建立成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Alert'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /alerts/{id}/acknowledge:
+    patch:
+      tags: [告警]
+      summary: 確認告警（open → acknowledged）
+      operationId: acknowledgeAlert
+      description: |
+        **角色限制**：僅 `operator`（維運人員）可呼叫。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 告警 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledged_by]
+              properties:
+                acknowledged_by:
+                  type: string
+                  example: "維運人員"
+      responses:
+        '200':
+          description: 更新後的告警物件
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Alert'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 狀態衝突（如告警已解決，不可再確認）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /alerts/{id}/resolve:
+    patch:
+      tags: [告警]
+      summary: 解決告警（acknowledged → resolved）
+      operationId: resolveAlert
+      description: |
+        **角色限制**：僅 `operator`（維運人員）可呼叫。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 告警 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolved_by, resolution_notes]
+              properties:
+                resolved_by:
+                  type: string
+                  example: "維運人員"
+                resolution_notes:
+                  type: string
+                  example: "已更換壓縮機潤滑油，出水溫度恢復正常"
+      responses:
+        '200':
+          description: 更新後的告警物件
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Alert'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── 月報 ─────────────────────────────────────
+  /reports/monthly:
+    get:
+      tags: [月報]
+      summary: 取得月報清單
+      operationId: listMonthlyReports
+      description: |
+        **角色限制**：僅 `manager`（高層管理者）可呼叫。
+      parameters:
+        - $ref: '#/components/parameters/SiteIdQuery'
+        - name: year
+          in: query
+          schema:
+            type: integer
+          description: 篩選年份
+      responses:
+        '200':
+          description: 月報清單
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [月報]
+      summary: 產生（或重新產生）月報
+      operationId: generateMonthlyReport
+      description: |
+        **角色限制**：僅 `manager`（高層管理者）可呼叫。
+
+        **可用率計算規則**：
+        - 計算公式：`可用率（%）= (月內 status ∉ {fault, offline} 的 5 分鐘區間數) ÷ 月內總 5 分鐘區間數 × 100`
+        - 資料來源：`status_snapshots` 表；不得以 `heat_pumps.current_status` 回推
+        - 月中新增設備自 `monitoring_started_at` 開始計算；月中移除設備計算至 `monitoring_ended_at`
+        - 若設備數量在該月有變動，`summary_html` 中必須標示「本月設備數量曾變動」
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [site_id, year, month]
+              properties:
+                site_id:
+                  type: integer
+                  example: 1
+                year:
+                  type: integer
+                  example: 2026
+                month:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  example: 4
+      responses:
+        '200':
+          description: 月報產生成功（或更新成功）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /reports/monthly/{id}:
+    get:
+      tags: [月報]
+      summary: 取得單一月報詳情（含 HTML 內容）
+      operationId: getMonthlyReport
+      description: |
+        **角色限制**：僅 `manager`（高層管理者）可呼叫。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 月報 ID
+      responses:
+        '200':
+          description: 月報詳情（含 summary_html）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── 老闆決策頁 ───────────────────────────────
+  /dashboard/summary:
+    get:
+      tags: [決策頁]
+      summary: 取得跨場域彙整摘要（老闆決策頁）
+      operationId: getDashboardSummary
+      description: |
+        **角色限制**：僅 `manager`（高層管理者）可呼叫。
+
+        **告警突增判斷**：若某場域 `this_month_alerts` 相較 `last_month_alerts`
+        增加至少 30% 且增加筆數至少 3 筆，則該場域的 `alert_spike` 欄位設為 `true`。
+      responses:
+        '200':
+          description: 跨場域彙整摘要
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardSummary'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ── 系統健康度 ───────────────────────────────
+  /system/health:
+    get:
+      tags: [系統]
+      summary: 取得後端系統健康度（供前端偵測降級狀態）
+      operationId: getSystemHealth
+      description: |
+        前端每 60 秒輪詢此端點。若 `status` 為 `degraded` 或 `down`，
+        前端應在 10 秒內顯示降級狀態 Banner（SC-006）。
+      security: []  # 健康度端點不需角色驗證
+      responses:
+        '200':
+          description: 系統健康度（即使部分服務降級，HTTP 仍回傳 200）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SystemHealth'
+
+# ── 通用回應 ──────────────────────────────────
+  responses:
+    NotFound:
+      description: 找不到指定資源
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: "NOT_FOUND"
+              message: "找不到指定資源"
+              details: null
+    Forbidden:
+      description: 角色權限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: "FORBIDDEN"
+              message: "此角色無權執行此操作"
+              details: null
+    UnprocessableEntity:
+      description: 請求格式錯誤或業務規則違反
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ServerError:
+      description: 後端內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: "INTERNAL_ERROR"
+              message: "伺服器內部錯誤，請稍後再試"
+              details: null
