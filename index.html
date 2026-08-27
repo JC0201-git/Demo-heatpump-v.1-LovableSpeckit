@@ -128,6 +128,17 @@ footer.pagefoot{max-width:1080px;margin:30px auto 0;padding:16px 18px;font-size:
 mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
 :root.theme-dark mark{background:#7a5b00;color:#ffe9a8;}
 .hidden-by-search{display:none !important;}
+.searchwrap{position:relative;}
+.search-results-panel{position:absolute;top:calc(100% + 6px);right:0;width:380px;max-width:min(420px,calc(100vw - 32px));max-height:70vh;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:200;display:none;}
+.search-results-panel.show{display:block;}
+.sr-meta{padding:9px 14px;font-size:12px;color:var(--text-dim);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);border-radius:12px 12px 0 0;}
+.sr-group{padding:7px 14px;font-size:11.5px;font-weight:800;color:var(--accent-text);background:var(--accent-dim);}
+.sr-item{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text);font-family:inherit;line-height:1.5;}
+.sr-item:hover,.sr-item:focus{background:var(--accent-dim);outline:none;}
+.sr-item .sr-ctx{font-size:11px;color:var(--text-dim);margin-bottom:3px;}
+.sr-empty{padding:16px 14px;font-size:13px;color:var(--text-dim);text-align:center;}
+.flash-hit{animation:flashhit 1.8s ease;}
+@keyframes flashhit{0%{box-shadow:0 0 0 3px var(--accent);border-radius:8px;}100%{box-shadow:0 0 0 0 transparent;}}
 @media print{
   header.topbar,footer.pagefoot,.practice-toolbar,.iconbtn,#searchInput{display:none;}
   .tabpanel{display:block !important;}
@@ -139,10 +150,13 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
 <header class="topbar">
   <div class="topbar-row1">
     <div class="brand">艾利潔股份有限公司｜審查委員 Q&amp;A 應答手冊
-      <small>116年度廢熱與廢冷回收技術示範應用專案補助・互動練習版・v2（2026-08-25）</small>
+      <small>116年度廢熱與廢冷回收技術示範應用專案補助・互動練習版・v3（2026-08-26）</small>
     </div>
     <div class="toolbtns">
-      <input id="searchInput" type="text" placeholder="搜尋題目／關鍵字…">
+      <div class="searchwrap">
+        <input id="searchInput" type="text" placeholder="搜尋題目／關鍵字／數字（跨頁籤）…" autocomplete="off">
+        <div class="search-results-panel" id="searchResultsPanel"></div>
+      </div>
       <button class="iconbtn" id="themeToggle" title="切換深色／淺色">🌓</button>
       <button class="iconbtn" onclick="window.print()" title="列印本頁">🖨️</button>
     </div>
@@ -159,8 +173,8 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
       <tr><th>補助計畫</th><td>經濟部能源署 116年度廢熱與廢冷回收技術示範應用專案補助</td></tr>
       <tr><th>示範場域</th><td>宜蘭縣五結鄉鎮安村西河一路35號（高熱負載布品洗滌製程）</td></tr>
       <tr><th>計畫期間</th><td>民國115年6月1日至116年12月31日（共18個月）</td></tr>
-      <tr><th>本手冊依據</th><td>①《艾利潔_審查委員QA應答手冊》（骨架）、②《審查簡報逐頁完整摘要》（正式對外數字）、③《環境廢熱能源鏈答詢手冊》（精算與邊界）、④能源鏈全圖、⑤《簡報數據與能源鏈手冊對照表》、⑥《計畫書 20260730 v4》（原始真理來源）</td></tr>
-      <tr><th>文件版本</th><td>2026年8月25日｜v2 整合版（取代v1）・本頁為可互動練習版</td></tr>
+      <tr><th>本手冊依據</th><td>①《艾利潔_審查委員QA應答手冊》（骨架）、②《審查簡報逐頁完整摘要》（正式對外數字）、③《環境廢熱能源鏈答詢手冊》（精算與邊界）、④能源鏈全圖、⑤《簡報數據與能源鏈手冊對照表》、⑥《計畫書 20260730 v4》（原始真理來源）、⑦《116年度審查簡報_final繳交》PDF（2026-08-26最終定稿，數字與②一致；本次COP量測邊界定案依此補充）</td></tr>
+      <tr><th>文件版本</th><td>2026年8月26日｜v3 整合版（取代v2；新增熱泵COP量測邊界定案、跨頁籤搜尋結果列表）・本頁為可互動練習版</td></tr>
     </table></div>
   </div>
 
@@ -181,7 +195,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
       <li>凡標示「⚠ 誠實揭露／建議提前準備」的色塊，代表目前文件仍有缺口，建議主動說明而非被動等候委員發現。</li>
       <li>凡數字右上角標示 <sup class="starnote">※</sup> 者，代表另有一組「精算版本」數字存在，正文採用的是<b>簡報正式對外版本</b>，差異原因一律載於附錄一，請勿在現場宣稱只有一個版本。</li>
       <li>附錄一是「已知數據差異與文件缺口總表」，可作為會議前的最後檢查清單（可勾選追蹤）；附錄二是逐項勾稽的詳細佐證。</li>
-      <li>右上角搜尋框可即時篩選各模組的題目與關鍵字；🎯練習模式可用來跟夥伴互相考題。</li>
+      <li>右上角搜尋框可<b>跨全部頁籤</b>搜尋題目、關鍵字與數字，輸入後會條列所有頁籤中符合的結果（含所在模組與段落），點擊任一筆即自動切換頁籤並跳轉、展開至該處；🎯練習模式可用來跟夥伴互相考題。</li>
     </ul>
   </div>
 
@@ -440,7 +454,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
 
   <details class="qa-item" data-module="2" id="qa-18">
     <summary><span class="qnum">Q18</span> 雙效熱泵的冷能效益，算進節電效益了嗎？</summary>
-    <div class="qa-answer"><p><b>A：</b><b>沒有</b>。現場目前沒有空調，只有風扇及自然通風，雙效熱泵產生的冷能（30.9 kW，約8.8冷凍噸，對1,392 m²空間平均冷能密度約22.2 W/m²）是改善工作環境的<b>附加效益</b>；財務試算並未計入這筆效益，屬於保守估計。答詢時建議主動點出這是保守作法——這是加分項，不是缺點。</p></div>
+    <div class="qa-answer"><p><b>A：</b><b>沒有</b>。現場目前沒有空調，只有風扇及自然通風，雙效熱泵產生的冷能（30.9 kW，約8.8冷凍噸，對1,392 m²空間平均冷能密度約22.2 W/m²）是改善工作環境的<b>附加效益</b>；財務試算並未計入這筆效益，屬於保守估計。答詢時建議主動點出這是保守作法——這是加分項，不是缺點。這筆冷能同樣<b>不計入</b>模組四的熱泵COP量測（詳模組四(2A)）：在未另行量測冰水流量及進、出水溫度前，冷、熱兩項效益分開計算，避免同一份壓縮機電力被重複認列。</p></div>
   </details>
 
   <div class="sourcecite"><b>📎 原文出處：</b>計畫書⑥頁12-14（表2與年廢熱量）、頁18（技術方案比較與熱泵重點）、頁19（圖15）、頁22-23（設備規格與型錄依據）、頁24（節能計量與效益評估、640,039／639,787、0.0801、975,844、735,653）、頁25（表4年減碳量效益估算）、頁29（未來擴大應用）、頁30（297.1與16.1%逸散率）、頁31-32（冷能30.9 kW與22.2 W/m²）、頁41（竣工會勘預期指標值69,586）、頁42-43（能源效益分析與回收年限）、頁51-57（表9總經費申請表）；審查簡報摘要②第6、7、8、9、11、13、15頁；能源鏈手冊③「三個不能互換的邊界」「能源鏈全圖」「核心計算簿①②③④」「委員模擬問答」技術計算／財務／文件勘誤類、「審查前必須統一的清單」第1、2、3、4、5、9項；對照表⑤ A13～A16、A18～A24、A30～A33。</div>
@@ -554,7 +568,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
       <tr class="hl"><td><b>本案採用值</b></td><td><b>3.8</b></td><td>本案進風是「工作區高溫空氣」20~40°C，工況接近A20/W55，理論上COP應更接近4.4~4.6，但計畫書刻意取一個「介於兩個工況之間」更保守的3.8，等於自我壓低效益預期</td></tr>
     </table></div>
     <p style="font-size:14px;"><b>額定製熱能力146.9 kW的組成（委員要求拆解時照這個講）：</b> 雙效5RT 13.5 kW ＋ 雙效10RT 28.4 kW ＋ 單效10RT 35.0 kW × 3台 ＝ 146.9 kW（＝126,334 kcal/hr）。型錄各參數表所載額定工況為「環境空氣乾球20°C／濕球15°C，水溫15°C→55°C」，即A20/W55。</p>
-    <p style="font-size:14px;">這是一個對公司有利的誠實揭露：公司沒有取對自己最有利的4.4~4.6，而是取偏保守的3.8，讓委員知道即使COP實測略低於設計值，方案仍有安全邊際，同時也是為什麼驗收門檻只要求COP≥3.5即可（而非要求達到3.8）。竣工會勘預期實測區間為3.6~3.9（計畫書頁41、47）。</p>
+    <p style="font-size:14px;">這是一個對公司有利的誠實揭露：公司沒有取對自己最有利的4.4~4.6，而是取偏保守的3.8，讓委員知道即使COP實測略低於設計值，方案仍有安全邊際，同時也是為什麼驗收門檻只要求COP≥3.5即可（而非要求達到3.8）。竣工會勘預期實測區間為3.6~3.9（計畫書頁41、47）。驗證階段之COP係以「<b>熱泵主機群</b>」整體為量測邊界（5台合計，非逐台個別驗證），詳細感測點配置與計算公式見模組四(2A)。</p>
   </div>
 
   <div class="sectitle">委員可能追問（Q19–Q23）</div>
@@ -608,6 +622,23 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
     </table></div>
     <p style="font-size:14px;"><b>第二列與第三列是委員最在意的兩件事：</b>第二列證明「熱真的是撿來的，不是用電硬燒的」；第三列證明「撿來的熱真的取代了瓦斯，不是熱水做出來卻沒人用」。計畫書頁46已明訂要做「熱泵回收熱量與實際鍋爐液化石油氣減量的交叉比對」，正是為了第三列。</p>
 
+    <div class="subtitle">(2A) COP量測邊界：為什麼用「熱泵主機群」整體量測，不是逐台驗證</div>
+    <p style="font-size:14px;">本案熱泵系統由雙效熱泵10RT×1、5RT×1與單效熱泵10RT×3共5台組成，5台主機採<b>並聯</b>方式設置，熱水側共用進水及出水主管，所產製之熱水共同供應4座1,000 L熱水儲槽及後端製程使用。由於每一台熱泵都是把熱能送進<b>同一條</b>熱水主管，且系統實際運轉採分段啟停與變頻容量調節（不是5台同時全載），本案以「<b>熱泵主機群</b>」整體作為COP量測邊界——量測5台加總後的整體效果，<b>不對個別主機分別驗證COP</b>。</p>
+    <div class="tblwrap"><table class="datatable">
+      <tr><th>感測點</th><th>設置位置</th><th>量測項目</th></tr>
+      <tr><td>① 流量計＋進水溫度感測器</td><td>5台熱泵<b>分流前</b>的共同回水主管（1處，共用）</td><td>熱泵群共同回水流量 V；共同進水溫度 Tin</td></tr>
+      <tr><td>② 出水溫度感測器</td><td>5台熱泵出水<b>完全匯流後</b>、進入儲槽及鍋爐混水點<b>之前</b></td><td>共同出水溫度 Tout</td></tr>
+      <tr><td>③ 智慧電表</td><td>5台熱泵<b>共同電源饋線</b></td><td>主機群真實有效功率與累積用電量</td></tr>
+    </table></div>
+    <p style="font-size:14px;"><b>瞬時製熱量：</b> Qh ＝ 1.163 × V × (Tout − Tin)　（Qh：熱泵群製熱能力kW；V：共同主管實測水流量m³/hr；Tin、Tout：熱泵群共同進、出水溫度°C）。1.163 ＝ 水密度1,000 kg/m³ × 比熱4.186 kJ/kg·°C ÷ 3,600 s/hr，與本模組(4)的Hrec＝ρ×V×Cp×ΔT是同一條熱力學公式，只是直接以kW表示、換算常數不同（kcal/hr版除以860即為kW）。</p>
+    <p style="font-size:14px;"><b>驗證期間整體加熱COP：</b> COPH ＝ 驗證期間累積熱水熱量(kWhth) ÷ 5台熱泵累積用電量(kWh)。系統設計COP仍為<b>3.8</b>（依據見模組三(5)），驗收門檻維持≥3.5不變。</p>
+    <div class="note"><b>務必主動說明的三個重點：</b></div>
+    <ul class="plain" style="font-size:14px;">
+      <li><b>這是加權整體COP，不是任何單一主機的COP。</b>本量測結果代表5台熱泵在實際啟停、部分負載及變頻運轉條件下的<b>加權整體加熱COP</b>，不代表任何單一主機的個別效率——委員若問「哪一台效率最好」，這套量測架構本身回答不了，因為量測邊界就是設在群組層級，不是刻意迴避，而是與並聯共管的系統設計一致。</li>
+      <li><b>雙效熱泵的冷能不算進這個COP。</b>雙效熱泵同時產生的冷能另屬冷側效益（見模組二Q18）；在未另行量測冰水流量及進、出水溫度前，<b>不將該冷能加入本項加熱COP</b>，避免同一份壓縮機電力被熱、冷兩邊重複計算。</li>
+      <li><b>用累積量計算，不用瞬時COP平均。</b>驗證應採「同一期間累積熱水熱量 ÷ 累積用電量」，<b>不採各分鐘瞬時COP的算術平均</b>，以避免主機啟停、低流量瞬間及儲槽循環等短暫狀態拉偏平均值。</li>
+    </ul>
+
     <div class="subtitle">(3) M&amp;V執行時程</div>
     <div class="tblwrap"><table class="datatable">
       <tr><th>階段</th><th>天數</th><th>目的</th></tr>
@@ -659,19 +690,19 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
     <div class="subtitle">(7) 儀表精度與資料治理</div>
     <div class="tblwrap"><table class="datatable">
       <tr><th>量測項目</th><th>量測位置</th><th>儀表精度</th><th>防造假／對帳機制</th></tr>
-      <tr><td>電力(kWh)</td><td>各熱泵主機電源端</td><td>±1%</td><td>智慧電錶讀值與台電總盤電表對帳</td></tr>
-      <tr><td>進出水溫(Tin/Tout)</td><td>板式熱交換器兩側</td><td>±0.3°C</td><td>兩側同時量測，溫差用於熱量計算</td></tr>
-      <tr><td>流量(V)</td><td>熱水側與冷凝水側</td><td>±1%</td><td>兩側皆裝，可交叉勾稽</td></tr>
+      <tr><td>電力(kWh)</td><td>5台熱泵<b>共同電源饋線</b>（智慧電表）</td><td>±1%</td><td>智慧電錶讀值與台電總盤電表對帳</td></tr>
+      <tr><td>進出水溫(Tin/Tout)</td><td>熱泵群<b>共同回水主管</b>（進水，分流前）／<b>共同出水主管</b>（出水，完全匯流後、進儲槽與鍋爐混水點前）</td><td>±0.3°C</td><td>進出水同時量測，溫差用於Qh＝1.163×V×ΔT計算</td></tr>
+      <tr><td>流量(V)</td><td>熱泵群<b>共同回水主管</b>（1台，與進水溫度感測器同一位置）</td><td>±1%</td><td>冷凝水（冰水）側目前未裝表，雙效熱泵冷能不計入本項加熱COP</td></tr>
       <tr><td>運轉時間(t)</td><td>熱泵控制器</td><td>±0.1%</td><td>用於能效計算</td></tr>
       <tr><td>壓差(ΔP)</td><td>循環泵進出水口</td><td>±0.5%</td><td>系統運轉安全判定</td></tr>
       <tr><td>外氣溫度</td><td>室外牆面</td><td>±0.5°C</td><td>建立基線修正因子</td></tr>
       <tr><td>作業區溫濕度</td><td>作業區代表點3~5處</td><td>±0.5°C／±3%RH</td><td>驗證雙效熱泵降溫效益與廢熱回收條件</td></tr>
       <tr><td>整體資料治理</td><td>—</td><td>—</td><td>每分鐘記錄、Modbus RTU→MQTT上傳雲端、每日自動彙整、至少保存3年、資料缺漏超過3%須補測或線性插補、驗收報告附Excel原始資料與回歸圖表供第三方查驗、具時間戳與簽章紀錄</td></tr>
     </table></div>
-    <p style="font-size:14px;"><b>感測位置的三個設計重點（計畫書頁45）：</b> 每台熱泵主機均連結智慧電錶與流量計；熱水側與冷凝水側皆設計進出水對照量測；系統設置時間校正程序，確保不同感測器間時間戳記同步。</p>
+    <p style="font-size:14px;"><b>感測位置的三個設計重點：</b> 電力、流量與進出水溫三項均設置於「熱泵主機群」共同管路與共同饋線上（詳見本模組(2A)），非逐台個別配置；系統設置時間校正程序，確保不同感測器間時間戳記同步；冷凝水（冰水）側目前未納入量測，雙效熱泵冷能不計入本項加熱COP。</p>
   </div>
 
-  <div class="sectitle">委員可能追問（Q24–Q28）</div>
+  <div class="sectitle">委員可能追問（Q24–Q29）</div>
 
   <details class="qa-item" data-module="4" id="qa-24">
     <summary><span class="qnum">Q24</span> 90%門檻聽起來很寬鬆，是不是故意設低讓自己好過關？實測EnPI-1要多低才算過關？</summary>
@@ -689,10 +720,20 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
   </details>
 
   <details class="qa-item" data-module="4" id="qa-27">
-    <summary><span class="qnum">Q27</span> M&amp;V是只驗證雙效熱泵，還是5台都驗？</summary>
+    <summary><span class="qnum">Q27</span> M&amp;V是只驗證雙效熱泵，還是5台都驗？COP是量哪一台，還是量整個系統？</summary>
     <div class="qa-answer">
-      <p><b>A：</b><b>5台（3台單效＋2台雙效）都會配置電錶及流量計、全部納入量測範圍</b>（計畫書頁45「每台熱泵主機均連結智慧電錶與流量計」）。</p>
-      <div class="warnbox">⚠ 誠實揭露／建議提前準備：　計畫書頁44在敘述IPMVP Option B時寫「針對雙效熱泵系統的輸入能量與輸出熱能進行獨立量測」，與頁45「每台熱泵主機均連結智慧電錶與流量計」用詞不一致，容易讓委員誤以為只驗2台。建議會前先統一用詞為「3台單效及2台雙效共5台全數納入量測」，或在答詢時主動說明這是局部段落用詞不夠精確。</div>
+      <p><b>A：</b>電力與熱量量測<b>涵蓋全部5台</b>（3台單效＋2台雙效），但COP的計算<b>以「熱泵主機群」整體為量測邊界</b>，不對單一主機分別驗證。5台主機並聯設置、熱水側共用進出水主管，因此在5台分流前的共同回水主管設1台流量計＋1支進水溫度感測器，在5台出水完全匯流後、進儲槽與鍋爐混水點之前設1支出水溫度感測器；電力則在5台共同電源饋線上以智慧電表量測真實有效功率與累積用電量。詳細感測點配置與計算公式見本模組(2A)。</p>
+      <div class="note">這個安排也一併釐清了先前一份文件用詞不夠精確之處（頁44寫「針對雙效熱泵系統」進行獨立量測、頁45寫「每台熱泵主機均連結智慧電錶與流量計」，兩處用詞曾不一致）——正確講法是：<b>電力與熱量量測5台全數涵蓋，COP以熱泵群整體邊界計算</b>，兩者並不衝突，答詢時可直接用這個說法統一回答。</div>
+    </div>
+  </details>
+
+  <details class="qa-item" data-module="4" id="qa-29">
+    <summary><span class="qnum">Q29</span> 為什麼COP用「熱泵主機群」整體量測，不怕掩蓋掉表現差的主機嗎？雙效熱泵的冷能會不會被重複計入節能效益？</summary>
+    <div class="qa-answer">
+      <p><b>A：</b>兩個問題分開回答。</p>
+      <p><b>第一，為什麼用群組邊界：</b>5台熱泵並聯、熱水側共用同一條進出水主管，且現場運轉是依負載分段啟停、變頻調節容量（不是5台同步全載運轉），任何時刻都可能是不同台數、不同負載組合在運轉。若要對「單一主機」量出乾淨的COP，必須在每台主機自己的進出水管上各裝一組流量計與溫度感測器，而不是只在群組共同主管上裝一組；本案的儀表配置是裝在共同主管上，量到的本來就是群組整體效果，這是量測邊界的設計選擇，不是為了掩蓋哪一台表現差。若委員要求逐台驗證，需再增加4組流量計與溫度感測器（現僅1組），可在答詢時說明這是可以加做、但非本期設計的量測範圍。</p>
+      <p><b>第二，冷能不重複計入：</b>雙效熱泵在製熱的同時，蒸發端會同步產生冷能（30.9 kW，見模組二Q18），這是<b>另一份效益</b>——來自同一份壓縮機電力，若同時被計入「熱泵幫我省了多少瓦斯」和「熱泵幫我省了多少冷氣電費」兩本帳，會變成同一度電被算兩次。本案<b>只計入加熱COP</b>，冷能效益目前不進節能財務試算（詳模組二Q18）；未來若要把冷能也算進效益，須另外加裝冰水側的流量計與進出水溫度感測器獨立量測，在此之前一律不疊加計算。</p>
+      <p><b>驗證方式的補充：</b>COPH以「驗證期間累積熱水熱量 ÷ 累積用電量」計算，不採各分鐘瞬時COP的算術平均——瞬時值在主機剛啟動、低流量或儲槽循環時會嚴重失真，用累積量計算才能反映真實整體效率（詳本模組(2A)）。</p>
     </div>
   </details>
 
@@ -710,7 +751,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
     </div>
   </details>
 
-  <div class="sourcecite"><b>📎 原文出處：</b>計畫書⑥頁6-7（排碳係數）、頁37-38（基線資料）、頁39-40（EnPI定義、達成率、EnPI-3、綜合碳排原單位0.4914、基線修正機制）、頁41（驗收條件與竣工會勘預期指標值）、頁43（驗收方式與年化62,627 kg）、頁44（IPMVP Option B與驗收階段、圖25）、頁45（儀表配置與Hrec公式）、頁46（Esaving公式、合格標準、資料對帳與交叉比對）、頁47-48（驗證週期、驗收指標與合格標準）、頁58（查核點）；審查簡報摘要②第10、12、15頁；能源鏈手冊③「M&amp;V量測驗證方法」（三層證據表、基準/設計/門檻統計數字、空氣側焓差限制說明）、「委員模擬問答」M&amp;V驗證類、「審查前必須統一的清單」第6項；對照表⑤ A25～A29、B10、B13。</div>
+  <div class="sourcecite"><b>📎 原文出處：</b>計畫書⑥頁6-7（排碳係數）、頁37-38（基線資料）、頁39-40（EnPI定義、達成率、EnPI-3、綜合碳排原單位0.4914、基線修正機制）、頁41（驗收條件與竣工會勘預期指標值）、頁43（驗收方式與年化62,627 kg）、頁44（IPMVP Option B與驗收階段、圖25）、頁45（儀表配置與Hrec公式）、頁46（Esaving公式、合格標準、資料對帳與交叉比對）、頁47-48（驗證週期、驗收指標與合格標準）、頁58（查核點）；審查簡報摘要②第10、12、15頁；能源鏈手冊③「M&amp;V量測驗證方法」（三層證據表、基準/設計/門檻統計數字、空氣側焓差限制說明）、「委員模擬問答」M&amp;V驗證類、「審查前必須統一的清單」第6項；對照表⑤ A25～A29、B10、B13；COP量測邊界（熱泵主機群法，本模組(2A)、Q27、Q29）依公司於2026-08-26定案之最終量測方法補充。</div>
 </section>
 
 <section id="tab-appendix1" class="tabpanel">
@@ -747,7 +788,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
       <tr><th style="width:38px;">✓</th><th>編號</th><th>缺口／差異項目</th><th>目前狀況</th><th>建議因應</th><th>對應模組</th></tr>
       <tr class="chk-row" data-critical="1"><td><input type="checkbox" class="chk"></td><td>乙1 <span class="badge badge-crit">🔴最優先</span></td><td>投資成本名稱與加總錯位</td><td>⑥頁25表4將「主要設備投資成本（熱泵主機4,942,616＋能源監控管理設備2,000,000）」與投資成本6,017,816元並列，但4,942,616＋2,000,000＝<b>6,942,616</b>（未稅專案總額），不等於6,017,816（符合補助費用）。四個金額（6,942,616／7,289,747／6,017,816／4,011,877）定義不同，不可互相替代或加總比對</td><td>逐一標明四個金額的定義（模組二Q15已備妥對照表）；建議會前修正表4欄位說明文字</td><td>模組二 Q15</td></tr>
       <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙2</td><td>圖15容易讓委員誤解</td><td>⑥頁19圖15同時呈現蒸氣冷凝水回收、回收桶及「建議2台熱泵」，與本期「5台氣冷式熱泵吸收工作環境熱空氣」主軸不完全一致</td><td>答詢以圖14、16、17、18為主；圖15宜修正或清楚標示為「既有／未來整合概念」</td><td>模組二 Q17</td></tr>
-      <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙3</td><td>M&amp;V範圍需涵蓋全部5台</td><td>⑥頁44寫「針對雙效熱泵系統」進行獨立量測，但頁45寫「每台熱泵主機均連結智慧電錶與流量計」，用詞不一致</td><td>統一說明3台單效及2台雙效<b>全部5台</b>皆納入量測</td><td>模組四 Q27</td></tr>
+      <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙3</td><td>M&amp;V範圍需涵蓋全部5台；COP量測邊界需明確定義</td><td><span class="badge badge-good">已定案（2026-08-26）</span>：電力與熱量量測涵蓋全部5台；COP以「熱泵主機群」整體為量測邊界（共用回水主管流量計＋進水溫、共用出水主管出水溫、共同電源饋線電表）計算，不對單一主機分別驗證；雙效熱泵冷能另計，不併入本項加熱COP</td><td>答詢時依此定案統一說明，不再使用⑥頁44、45兩處不一致的舊用詞</td><td>模組四 (2A)、Q27、Q29</td></tr>
       <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙4</td><td>「136餘萬元節能效益」的寫法</td><td>⑥計畫書摘要表A-4寫「年節能效益達136餘萬元」，未註明是燃料費<b>毛</b>節省</td><td>答詢時主動說明毛額與淨額差異；建議摘要表改寫為「年淨節省約40.9~55.3萬元」</td><td>模組二 Q14</td></tr>
       <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙5</td><td>10 m³/hr 流量與35°C溫差對不起來</td><td>若10 m³/hr全部升溫35°C（20→55°C），熱量約407 kW，與146.9 kW不符</td><td><b>已確認</b>：10 m³/hr為循環變頻泵浦額定流量（系統總循環量），非熱泵實際吸熱流量；變頻泵浦依負載調整運轉點。答詢時<b>主動說明</b>此對應關係</td><td>模組二 Q12</td></tr>
       <tr class="chk-row"><td><input type="checkbox" class="chk"></td><td>乙6</td><td>綜合碳排原單位0.5222的計算基礎未說明</td><td>0.5222使用<b>實際燃料組成</b>（LPG依2.9013、燃料油依3.1210分別計算），若誤用「387,788 kg LPG當量×2.9013」會算出0.5160，對不起來</td><td>在計算附件補上完整算式（模組四Q28已備妥）；此為保守且正確的處理，值得主動說明</td><td>模組四 Q28</td></tr>
@@ -905,7 +946,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
       <label class="modchip"><input type="checkbox" class="modf" value="1" checked>模組一（Q1-5）</label>
       <label class="modchip"><input type="checkbox" class="modf" value="2" checked>模組二（Q6-18）</label>
       <label class="modchip"><input type="checkbox" class="modf" value="3" checked>模組三（Q19-23）</label>
-      <label class="modchip"><input type="checkbox" class="modf" value="4" checked>模組四（Q24-28）</label>
+      <label class="modchip"><input type="checkbox" class="modf" value="4" checked>模組四（Q24-29）</label>
       <label class="modchip"><input type="checkbox" id="shuffleToggle">🔀 隨機出題</label>
       <label class="modchip"><input type="checkbox" id="weakOnlyToggle">🔁 只看待加強</label>
       <button class="btn secondary" id="buildDeckBtn">套用篩選／重新開始</button>
@@ -938,7 +979,7 @@ mark{background:#fde68a;color:#3b2f00;padding:0 2px;border-radius:3px;}
 
 </main>
 <footer class="pagefoot">
-  本手冊依據①骨架手冊、②審查簡報逐頁完整摘要、③環境廢熱能源鏈答詢手冊、④能源鏈全圖、⑤簡報數據對照表、⑥計畫書20260730 v4 整合。對外一律採用②簡報數字，精算版本以 <sup class="starnote">※</sup> 標示、差異原因見附錄一。僅供艾利潔股份有限公司內部審查前練習使用。
+  本手冊依據①骨架手冊、②審查簡報逐頁完整摘要、③環境廢熱能源鏈答詢手冊、④能源鏈全圖、⑤簡報數據對照表、⑥計畫書20260730 v4、⑦116年度審查簡報final繳交版（2026-08-26）整合。對外一律採用②簡報數字，精算版本以 <sup class="starnote">※</sup> 標示、差異原因見附錄一。僅供艾利潔股份有限公司內部審查前練習使用。
 </footer>
 <script>
 
@@ -1034,16 +1075,164 @@ function initChecklist(checkboxSelector, countElId, barElId){
   update();
 }
 
-// ===== Search filter =====
+// ===== Search filter (per-tab hide) + cross-tab results list =====
+
+// Build a flat index of "searchable units" across all tabs, once, at load.
+// Unit granularity: whole qa-item (Q+A), one table row, or one leaf prose
+// block (p / li / note / warnbox / critbox / goodbox / conclusion / scriptbox
+// / sourcecite / heading / plain content div). Each unit records which tab
+// and which subtitle/sectitle it sits under, so results can be grouped and
+// jumped to.
+function buildSearchIndex(){
+  const entries = [];
+  const tabLabelMap = {};
+  TAB_LIST.forEach(t=>{ tabLabelMap[t.id] = t.label; });
+  const main = document.getElementById('mainArea');
+  if(!main) return entries;
+  const consumed = new Set();
+  const STRUCT_DIV_CLASSES = new Set(['card','tblwrap','imgbox','practice-toolbar','drillcard','drillctrls','drillmeta','timerwrap','tips3','toolbtns','searchwrap','modchip','progresschip','progressbar','qa-answer','qGrid','wrap']);
+
+  function isConsumedAncestor(el){
+    let n = el.parentElement;
+    while(n && n!==main){
+      if(consumed.has(n)) return true;
+      n = n.parentElement;
+    }
+    return false;
+  }
+  function hasDirectText(el){
+    for(const child of el.childNodes){
+      if(child.nodeType===3 && child.textContent.trim().length>0) return true;
+    }
+    return false;
+  }
+  function pushEntry(tabId, tabLabel, context, title, rawText, target, isQA){
+    const text = rawText.replace(/\s+/g,' ').trim();
+    if(!text) return;
+    entries.push({tabId, tabLabel, context, title: title||context, textLower: text.toLowerCase(), snippet: text, target, isQA:!!isQA});
+  }
+
+  let currentTabId = '', currentTabLabel = '';
+  let currentSectitle = '', currentSubtitle = '';
+  const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT, null);
+  let node;
+  while((node = walker.nextNode())){
+    if(node.tagName === 'SECTION' && node.classList.contains('tabpanel')){
+      currentTabId = node.id.replace('tab-','');
+      currentTabLabel = tabLabelMap[currentTabId] || currentTabId;
+      currentSectitle=''; currentSubtitle='';
+      continue;
+    }
+    if(isConsumedAncestor(node)) continue;
+
+    if(node.classList.contains('sectitle')){ currentSectitle = node.textContent.trim(); currentSubtitle=''; continue; }
+    if(node.classList.contains('subtitle')){ currentSubtitle = node.textContent.trim(); continue; }
+
+    if(node.classList.contains('qa-item')){
+      consumed.add(node);
+      const summary = node.querySelector('summary');
+      const qnum = summary && summary.querySelector('.qnum') ? summary.querySelector('.qnum').textContent.trim() : '';
+      const qtext = summary ? summary.textContent.replace(qnum,'').trim() : '';
+      const answerEl = node.querySelector('.qa-answer');
+      const bodyText = answerEl ? answerEl.textContent : '';
+      pushEntry(currentTabId, currentTabLabel, currentSectitle, (qnum?qnum+' ':'')+qtext, qnum+' '+qtext+'　'+bodyText, node, true);
+      continue;
+    }
+
+    if(node.tagName === 'TABLE' && node.classList.contains('datatable')){
+      consumed.add(node);
+      Array.from(node.querySelectorAll('tr')).forEach(tr=>{
+        const isHeader = tr.children.length>0 && Array.from(tr.children).every(c=>c.tagName==='TH');
+        if(isHeader) return;
+        pushEntry(currentTabId, currentTabLabel, currentSubtitle||currentSectitle, currentSubtitle||currentSectitle, tr.textContent, tr, false);
+      });
+      continue;
+    }
+
+    const cls = node.classList;
+    const isLeafBox = cls.contains('note')||cls.contains('warnbox')||cls.contains('critbox')||cls.contains('goodbox')||cls.contains('conclusion')||cls.contains('scriptbox')||cls.contains('sourcecite')||cls.contains('imgcap');
+    if(isLeafBox){
+      consumed.add(node);
+      pushEntry(currentTabId, currentTabLabel, currentSubtitle||currentSectitle, currentSubtitle||currentSectitle, node.textContent, node, false);
+      continue;
+    }
+
+    if(node.tagName==='P' || node.tagName==='LI'){
+      pushEntry(currentTabId, currentTabLabel, currentSubtitle||currentSectitle, currentSubtitle||currentSectitle, node.textContent, node, false);
+      continue;
+    }
+
+    if(/^H[1-4]$/.test(node.tagName)){
+      pushEntry(currentTabId, currentTabLabel, currentSubtitle||currentSectitle, node.textContent, node.textContent, node, false);
+      continue;
+    }
+
+    if(node.tagName==='DIV'){
+      const hasStruct = Array.from(node.classList).some(c=>STRUCT_DIV_CLASSES.has(c));
+      if(!hasStruct && hasDirectText(node)){
+        consumed.add(node);
+        pushEntry(currentTabId, currentTabLabel, currentSubtitle||currentSectitle, currentSubtitle||currentSectitle, node.textContent, node, false);
+        continue;
+      }
+    }
+  }
+  return entries;
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+}
+
+// Build a highlighted snippet centred on the first match of q inside rawText.
+function highlightSnippet(rawText, q){
+  const lower = rawText.toLowerCase();
+  const idx = lower.indexOf(q);
+  const RADIUS = 46;
+  let start = 0, end = Math.min(rawText.length, 110), prefix='', suffix='';
+  if(idx >= 0){
+    start = Math.max(0, idx - RADIUS);
+    end = Math.min(rawText.length, idx + q.length + RADIUS);
+    prefix = start>0 ? '…' : '';
+    suffix = end<rawText.length ? '…' : '';
+    const slice = rawText.slice(start,end);
+    const rel = idx-start;
+    return prefix + escapeHtml(slice.slice(0,rel)) + '<mark>' + escapeHtml(slice.slice(rel, rel+q.length)) + '</mark>' + escapeHtml(slice.slice(rel+q.length)) + suffix;
+  }
+  suffix = end<rawText.length ? '…' : '';
+  return escapeHtml(rawText.slice(start,end)) + suffix;
+}
+
+function openAncestorDetails(el){
+  let n = el;
+  while(n){
+    n = n.closest('details');
+    if(!n) break;
+    n.open = true;
+    n = n.parentElement;
+  }
+}
+
 (function(){
   const input = document.getElementById('searchInput');
-  if(!input) return;
+  const panel = document.getElementById('searchResultsPanel');
+  if(!input || !panel) return;
+  const SEARCH_INDEX = buildSearchIndex();
+  let lastResults = [];
   let debounceT = null;
+
   input.addEventListener('input', ()=>{
     clearTimeout(debounceT);
-    debounceT = setTimeout(runSearch, 100);
+    debounceT = setTimeout(()=>{ runLocalHide(); runGlobalSearch(); }, 100);
   });
-  function runSearch(){
+  input.addEventListener('focus', ()=>{ if(input.value.trim()) runGlobalSearch(); });
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.searchwrap')) panel.classList.remove('show');
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape') panel.classList.remove('show');
+  });
+
+  function runLocalHide(){
     const q = input.value.trim().toLowerCase();
     document.querySelectorAll('details.qa-item').forEach(el=>{
       const text = el.textContent.toLowerCase();
@@ -1057,6 +1246,47 @@ function initChecklist(checkboxSelector, countElId, barElId){
         if(isHeader) return;
         const text = tr.textContent.toLowerCase();
         tr.classList.toggle('hidden-by-search', q.length>0 && !text.includes(q));
+      });
+    });
+  }
+
+  function runGlobalSearch(){
+    const raw = input.value.trim();
+    if(!raw){ panel.classList.remove('show'); panel.innerHTML=''; lastResults=[]; return; }
+    const q = raw.toLowerCase();
+    const matches = SEARCH_INDEX.filter(e=>e.textLower.includes(q));
+    if(matches.length===0){
+      panel.innerHTML = '<div class="sr-empty">找不到符合「'+escapeHtml(raw)+'」的內容</div>';
+      panel.classList.add('show');
+      lastResults = [];
+      return;
+    }
+    const CAP = 200;
+    lastResults = matches.slice(0, CAP);
+    let html = '<div class="sr-meta">跨全部頁籤共 '+matches.length+' 筆結果'+(matches.length>CAP?'（顯示前'+CAP+'筆，請縮小關鍵字）':'')+'</div>';
+    let lastTab = null;
+    lastResults.forEach((m, i)=>{
+      if(m.tabId !== lastTab){
+        html += '<div class="sr-group">'+escapeHtml(m.tabLabel)+'</div>';
+        lastTab = m.tabId;
+      }
+      const ctx = (m.context && m.context !== m.title) ? '<div class="sr-ctx">'+escapeHtml(m.context)+'</div>' : '';
+      html += '<button type="button" class="sr-item" data-idx="'+i+'">'+ctx+'<div>'+highlightSnippet(m.snippet, q)+'</div></button>';
+    });
+    panel.innerHTML = html;
+    panel.classList.add('show');
+    panel.querySelectorAll('.sr-item').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const m = lastResults[parseInt(btn.dataset.idx,10)];
+        if(!m) return;
+        switchTab(m.tabId);
+        panel.classList.remove('show');
+        requestAnimationFrame(()=>{
+          openAncestorDetails(m.target);
+          m.target.scrollIntoView({behavior:'smooth', block:'center'});
+          m.target.classList.add('flash-hit');
+          setTimeout(()=>m.target.classList.remove('flash-hit'), 1800);
+        });
       });
     });
   }
